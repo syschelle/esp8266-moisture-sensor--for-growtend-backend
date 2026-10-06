@@ -3,8 +3,13 @@ name: build
 on:
   push:
     branches: [ main ]
+    tags:
+      - "v*"
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   platformio:
@@ -42,7 +47,7 @@ jobs:
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: esp8266-moisture-sensor-v0.1.1
+          name: esp8266-moisture-sensor-v0.1.2
           path: |
             ota-dist/firmware.bin
             ota-dist/firmware.bin.sha256
@@ -50,3 +55,28 @@ jobs:
             ota-dist/README.md
           if-no-files-found: error
           retention-days: 30
+
+      - name: Create or update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists."
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "ESP8266 Moisture Sensor $GITHUB_REF_NAME" \
+              --notes-file RELEASE_NOTES.md
+          fi
+
+      - name: Upload firmware to GitHub Release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            ota-dist/firmware.bin \
+            ota-dist/firmware.bin.sha256 \
+            ota-dist/manifest.json \
+            ota-dist/README.md \
+            --clobber

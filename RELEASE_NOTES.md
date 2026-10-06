@@ -1,39 +1,47 @@
-# ESP8266 Moisture Sensor v0.1.1
+# ESP8266 Moisture Sensor v0.1.2
 
-This release improves the GitHub Actions build pipeline so every successful CI build provides a downloadable firmware package.
+This release completes the GitHub firmware publishing workflow.
 
-## GitHub Actions
+## GitHub Release assets
 
-- pins the hosted runner to `ubuntu-24.04`
-- runs the existing static validation
+When a version tag is pushed, GitHub Actions now:
+
 - builds the ESP8266 firmware with PlatformIO
-- creates the OTA package with `scripts/make_ota.py`
-- verifies that all expected OTA files were generated
-- uploads the generated files as a GitHub Actions artifact
-- names the artifact `esp8266-moisture-sensor-v0.1.1`
-- keeps the artifact for 30 days
+- creates the OTA package
+- keeps the normal GitHub Actions artifact
+- creates the matching GitHub Release when necessary
+- uploads the compiled firmware directly to the GitHub Release assets
 
-## Firmware artifact contents
-
-The downloadable GitHub Actions artifact contains:
+The GitHub Release now contains:
 
 - `firmware.bin`
 - `firmware.bin.sha256`
 - `manifest.json`
 - `README.md`
 
-The artifact is available from the workflow run summary after a successful build.
+The standard GitHub-generated source archives remain available as well.
+
+## Build pipeline
+
+The workflow continues to:
+
+- use `ubuntu-24.04`
+- run static project validation
+- build with `pio run -e d1_mini`
+- create the OTA package with `scripts/make_ota.py`
+- verify all generated files
+- upload `esp8266-moisture-sensor-v0.1.2` as a GitHub Actions artifact
 
 ## Firmware functionality
 
-The sensor firmware itself is unchanged from v0.1.0:
+Sensor functionality is unchanged from v0.1.1:
 
 - ESP8266 / Wemos D1 mini target
 - capacitive analog soil-moisture sensor on A0
-- configurable signal-pin setting in the web interface
+- configurable signal-pin setting
 - averaged and smoothed ADC measurements
 - dry/wet calibration
-- 0 to 100 % moisture calculation
+- 0 to 100 % soil-moisture calculation
 - `/api/current-values`
 - `/api/health`
 - Wi-Fi fallback AP
@@ -45,4 +53,4 @@ The sensor firmware itself is unchanged from v0.1.0:
 
 ## Version
 
-v0.1.1
+v0.1.2

@@ -1,4 +1,4 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.1
+# Build / validation status — ESP8266 Moisture Sensor v0.1.2
 
 ## Completed in the artifact environment
 
@@ -11,22 +11,28 @@
 - OTA repository / manifest configuration presence: PASS
 - canonical release-document policy: PASS
 - JavaScript syntax check: PASS
-- GitHub Actions firmware-artifact workflow validation: PASS
+- GitHub Actions firmware artifact workflow validation: PASS
+- GitHub Release asset publishing workflow validation: PASS
 - ZIP packaging and SHA-256 generation: PASS
 
 ## GitHub Actions workflow
 
-The workflow now:
+For normal pushes and pull requests the workflow:
 
 1. runs on `ubuntu-24.04`
 2. installs PlatformIO
 3. runs `scripts/validate_project.py`
 4. builds with `pio run -e d1_mini`
-5. creates the OTA package with `scripts/make_ota.py`
+5. creates the OTA package
 6. verifies the generated files
-7. uploads `esp8266-moisture-sensor-v0.1.1` as a GitHub Actions artifact
+7. uploads `esp8266-moisture-sensor-v0.1.2` as a GitHub Actions artifact
 
-Expected artifact contents:
+For pushed version tags (`v*`) it additionally:
+
+8. creates the matching GitHub Release if needed
+9. uploads the built firmware files directly to the GitHub Release assets
+
+Expected GitHub Release assets:
 
 - `firmware.bin`
 - `firmware.bin.sha256`
@@ -35,15 +41,13 @@ Expected artifact contents:
 
 ## Local firmware build
 
-The authoritative local build command remains:
-
 ```powershell
 pio run -e d1_mini
 ```
 
 ## Repository release-document policy
 
-Only the current source version keeps these release documents in the repository root:
+Only the current source version keeps these release documents:
 
 - `BUILD_STATUS.md`
 - `RELEASE_NOTES.md`

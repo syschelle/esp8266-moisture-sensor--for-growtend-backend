@@ -30,6 +30,9 @@ jobs:
       - name: Static validation
         run: python scripts/validate_project.py
 
+      - name: Internal regression tests
+        run: python tests/internal_tests.py
+
       - name: Build firmware
         run: pio run -e d1_mini
 
@@ -47,7 +50,7 @@ jobs:
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: esp8266-moisture-sensor-v0.1.10
+          name: esp8266-moisture-sensor-v0.1.12
           path: |
             ota-dist/firmware.bin
             ota-dist/firmware.bin.sha256

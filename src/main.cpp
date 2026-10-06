@@ -128,7 +128,13 @@ static bool loadOtaRecord(OtaRecord& r) {
 }
 
 static void clearOtaRecord() {
-  OtaRecord r; memset(&r, 0, sizeof(r));
+  OtaRecord r{};
+  r.magic = 0;
+  r.phase = 0;
+  r.fromVersion[0] = '\0';
+  r.targetVersion[0] = '\0';
+  r.error[0] = '\0';
+  r.crc = 0;
   EEPROM.put(OTA_RECORD_OFFSET, r);
   EEPROM.commit();
 }
@@ -533,7 +539,7 @@ static bool downloadAndFlashOta(const OtaManifest& manifest, String& error) {
   while (http.connected() && total < manifest.size) {
     size_t available = stream->available();
     if (available) {
-      size_t want = min(available, sizeof(buffer)); size_t got = stream->readBytes(buffer, want);
+      size_t want = (available < sizeof(buffer)) ? available : sizeof(buffer); size_t got = stream->readBytes(buffer, want);
       if (got) {
         lastDataMs = millis(); sha.update(buffer, got);
         if (Update.write(buffer, got) != got) { error = "Firmware flash write failed"; scheduleRestart(1200); http.end(); saveOtaRecord(5, manifest.version, error); return false; }
@@ -773,14 +779,6 @@ static void otaUploadFinished() {
   }
 }
 
-static void rawOtaUpload() {
-  // This handler is used when the browser sends application/octet-stream.
-  if (!server.hasArg("plain")) {
-    sendError(400, "No firmware body");
-    return;
-  }
-  sendError(415, "Use multipart upload");
-}
 
 static void setupRoutes() {
   server.on("/", HTTP_GET, [](){ server.send_P(200, "text/html; charset=utf-8", WEB_UI); });

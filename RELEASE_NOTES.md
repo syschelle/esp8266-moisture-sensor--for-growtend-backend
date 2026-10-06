@@ -1,29 +1,25 @@
-# ESP8266 Moisture Sensor v0.1.10
+# ESP8266 Moisture Sensor v0.1.12
 
-This release fixes an ESP8266 build error in the OTA failure handling.
+This release fixes an IntelliSense / C++ type mismatch in the OTA download buffer calculation.
 
 ## Build fix
 
-The previous OTA implementation used:
+The previous code used:
 
-`Update.abort()`
+`min(available, sizeof(buffer))`
 
-`UpdaterClass` in the ESP8266 Arduino core does not provide an `abort()` method, which caused compilation to fail.
+Depending on the host/compiler type definitions, the arguments can be interpreted as different unsigned integer types (`size_t` vs. `unsigned long long`), which causes overload resolution to fail.
 
-The unsupported calls have been removed.
+The code now uses an explicit type-safe conditional expression:
 
-If an OTA download, flash write, timeout or SHA-256 verification fails, the firmware now records the error and schedules a restart without calling `Update.end()`. This discards the unfinished OTA session while keeping the currently installed firmware active.
+`size_t want = (available < sizeof(buffer)) ? available : sizeof(buffer);`
 
-## OTA behavior retained
+This removes the overload ambiguity without changing behavior.
 
-- update availability check
-- conditional `Update installieren` button
-- no confirmation alert
-- OTA process logging
-- SHA-256 verification
-- automatic reboot/reconnect handling
-- persistent OTA result reporting
+## Tests
+
+The internal regression test suite now checks that the mixed-type `min()` expression is not reintroduced.
 
 ## Version
 
-v0.1.10
+v0.1.12

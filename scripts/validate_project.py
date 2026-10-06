@@ -14,8 +14,8 @@ ui = (root / "src" / "web_ui.h").read_text(encoding="utf-8")
 readme = (root / "README.md").read_text(encoding="utf-8")
 release = (root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
 
-require('#define APP_VERSION "0.1.10"' in version_h, "version header")
-require("v0.1.10" in readme and "v0.1.10" in release, "release version consistency")
+require('#define APP_VERSION "0.1.12"' in version_h, "version header")
+require("v0.1.12" in readme and "v0.1.12" in release, "release version consistency")
 require('"/api/current-values"' in main, "current-values API")
 require('"/api/health"' in main, "health API")
 require('pin != "A0"' in main, "A0 pin validation")
@@ -32,7 +32,7 @@ require("runs-on: ubuntu-24.04" in workflow, "fixed Ubuntu runner")
 require("pio run -e d1_mini" in workflow, "PlatformIO firmware build")
 require("python scripts/make_ota.py" in workflow, "OTA package creation")
 require("actions/upload-artifact@v4" in workflow, "firmware artifact upload")
-require("esp8266-moisture-sensor-v0.1.10" in workflow, "versioned firmware artifact name")
+require("esp8266-moisture-sensor-v0.1.12" in workflow, "versioned firmware artifact name")
 require("ota-dist/firmware.bin" in workflow, "firmware.bin artifact")
 require('tags:' in workflow and '"v*"' in workflow, "tag-triggered release workflow")
 require("permissions:" in workflow and "contents: write" in workflow, "release write permission")
@@ -100,6 +100,13 @@ require("if(activePage==='log')loadLog()" in ui, "System log live refresh")
 
 require("Update.abort()" not in main, "no unsupported Update.abort")
 require("scheduleRestart(1200)" in main, "failed OTA restart cleanup")
+
+require("memset(&r, 0, sizeof(r))" not in main, "no OtaRecord memset warning")
+require("rawOtaUpload()" not in main, "no unused rawOtaUpload")
+require((root / "tests" / "internal_tests.py").exists(), "internal regression tests present")
+require("python tests/internal_tests.py" in workflow, "internal regression tests in CI")
+
+require("min(available, sizeof(buffer))" not in main, "no mixed-type min in OTA buffer sizing")
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

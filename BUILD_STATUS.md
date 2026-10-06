@@ -1,21 +1,20 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.10
+# Build / validation status — ESP8266 Moisture Sensor v0.1.12
 
 ## Completed in the artifact environment
 
-- project structure validation: PASS
-- release version consistency: PASS
-- unsupported `Update.abort()` removed: PASS
-- failed OTA path schedules reboot without finalizing update: PASS
-- OTA status/logging workflow retained: PASS
+- static project validation: PASS
+- internal regression tests: PASS
+- mixed-type `min()` OTA buffer expression removed: PASS
+- warning regressions from v0.1.11 remain fixed: PASS
 - JavaScript syntax: PASS
 - ZIP packaging and SHA-256 generation: PASS
 
-## Important
-
-The full ESP8266 compile/link build must still be confirmed by PlatformIO/GitHub Actions.
-
-## Local build
+## Local checks
 
 ```powershell
+python scripts/validate_project.py
+python tests/internal_tests.py
 pio run -e d1_mini
 ```
+
+The final ESP8266 compile/link result is still confirmed by PlatformIO locally or in GitHub Actions.

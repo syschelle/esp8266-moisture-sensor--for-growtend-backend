@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, json, shutil, sys
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.3"
+VERSION = "0.1.6"
 REPO = "syschelle/esp8266-moisture-sensor--for-growtend-backend"
 BIN = ROOT / ".pio" / "build" / "d1_mini" / "firmware.bin"
 OUT = ROOT / "ota-dist"
@@ -19,7 +19,7 @@ sha = hashlib.sha256(data).hexdigest()
 (OUT / "firmware.bin.sha256").write_text(f"{sha}  firmware.bin\n", encoding="utf-8")
 manifest = {
     "version": VERSION,
-    "url": f"https://raw.githubusercontent.com/{REPO}/ota/firmware.bin",
+    "url": f"https://github.com/{REPO}/releases/latest/download/firmware.bin",
     "size": len(data),
     "sha256": sha
 }

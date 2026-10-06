@@ -318,6 +318,7 @@ static void apiState() {
   doc["app"] = APP_NAME;
   doc["version"] = APP_VERSION;
   doc["uptime_seconds"] = millis() / 1000UL;
+  doc["free_heap"] = ESP.getFreeHeap();
 
   JsonObject settings = doc["settings"].to<JsonObject>();
   settings["device_name"] = cfg.deviceName;
@@ -347,6 +348,7 @@ static void apiState() {
   wifi["ip"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : "";
   wifi["ap_active"] = apActive;
   wifi["ap_ip"] = apActive ? WiFi.softAPIP().toString() : "";
+  wifi["mode"] = WiFi.status() == WL_CONNECTED ? "STA" : (apActive ? "AP" : "OFFLINE");
 
   JsonObject tim = doc["time"].to<JsonObject>();
   tim["valid"] = timeValid();

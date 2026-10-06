@@ -1,44 +1,42 @@
-# ESP8266 Moisture Sensor v0.1.3
+# ESP8266 Moisture Sensor v0.1.6
 
-This release fixes the remaining device naming inherited from the original project and makes the setup/AP identity consistent.
+This release fixes OTA update checks by switching completely from the unused `ota` branch to GitHub Release assets.
 
-## Naming cleanup
+## OTA fix
 
-- removes remaining legacy project-name references
-- keeps the fallback AP SSID as `MoistureSensor-<CHIPID>`
-- keeps the default device name as `SoilSensor-1`
-- keeps the fallback AP password as `MS-Setup-8266`
-- ensures the web UI, logs, documentation and firmware metadata consistently use the ESP8266 Moisture Sensor naming
+The firmware no longer requests:
 
-## README
+`https://raw.githubusercontent.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/ota/manifest.json`
 
-The project description now explicitly states that the sensor is intended for direct integration with:
+That URL returned HTTP 404 because no dedicated OTA branch is required by the current release workflow.
 
-`syschelle/growtent-backend`
+The firmware now uses the latest GitHub Release directly:
 
-## Validation
+`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/manifest.json`
 
-Project checks now fail if the legacy display-project name is reintroduced.
+The generated manifest points to:
 
-## Existing functionality retained
+`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/firmware.bin`
 
-- ESP8266 / Wemos D1 mini target
-- capacitive analog soil-moisture sensor on A0
-- configurable signal-pin setting
-- averaged and smoothed ADC measurements
-- dry/wet calibration
-- 0 to 100 % soil-moisture calculation
-- `/api/current-values`
-- `/api/health`
-- Wi-Fi fallback AP
-- NTP
-- German/English web interface
-- light/dark theme
-- browser-assisted OTA
-- GitHub Actions firmware artifact
-- GitHub Release firmware assets
-- factory reset
+## Release workflow
+
+The existing tag workflow already builds and publishes:
+
+- `firmware.bin`
+- `firmware.bin.sha256`
+- `manifest.json`
+- `README.md`
+
+These files are now both published and consumed from the same GitHub Release path.
+
+## Result
+
+The OTA process now has one consistent source of truth:
+
+`Git tag -> GitHub Actions -> GitHub Release -> OTA update`
+
+No separate `ota` branch is needed.
 
 ## Version
 
-v0.1.3
+v0.1.6

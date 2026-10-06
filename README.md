@@ -2,49 +2,96 @@
 
 This ESP8266-based sensor reads one capacitive analog soil-moisture sensor and exposes the current moisture value via HTTP for direct integration with the `syschelle/growtent-backend` project.
 
-**Current version: v0.1.3**
+**Current version: v0.1.6**
+
+## Scope
+
+The firmware is intentionally focused on one task: measuring soil moisture and making that value available to the GrowTent backend.
+
+There is:
+
+- no segment display
+- no local measurement display hardware
+- no external temperature polling
+- no external measurement server configuration
+- no remote temperature cache
+
+The ESP8266 itself is the measurement source.
 
 ## Hardware
 
-- ESP8266, tested target: Wemos/Lolin D1 mini compatible
-- Capacitive soil moisture sensor with analog output
-- Sensor wiring:
-  - VCC -> 3.3 V
-  - GND -> GND
-  - AOUT -> A0
+- ESP8266, Wemos/Lolin D1 mini compatible target
+- one capacitive analog soil-moisture sensor
 
-> Important: ESP8266 boards differ in the voltage accepted on A0. A Wemos/Lolin D1 mini typically includes an onboard divider, while a bare ESP8266 ADC input is not equivalent. Verify the electrical limits of the exact board before connecting the sensor output.
+Typical wiring:
+
+- VCC -> 3.3 V
+- GND -> GND
+- AOUT -> A0
+
+Verify the accepted ADC input voltage for the exact ESP8266 board before connecting the sensor.
 
 ## Signal pin
 
-The signal pin is stored as a normal runtime setting and can be selected in the web interface.
+The signal pin is configurable in the web interface.
 
-For ESP8266 v0.1.0 the only valid analog selection is:
+On ESP8266 v0.1.6 the supported analog input is:
 
 `A0`
 
-The setting is intentionally modeled as a selectable pin so a later ESP32 variant can expose multiple ADC pins without changing the configuration concept.
+The configuration model remains generic so a future ESP32 variant can expose multiple ADC pins.
 
 ## Measurement
 
-Default behavior:
+Defaults:
 
-- measurement interval: 5 s
+- measurement interval: 5 seconds
 - 10 ADC samples per measurement
-- samples are averaged
-- an exponential filter smooths the result
-- calibrated result is limited to 0..100 %
+- sample averaging
+- additional smoothing
+- calibrated result limited to 0..100 %
 
-Calibration uses two stored ADC reference points:
+Calibration:
 
-- `dry_adc` -> 0 %
-- `wet_adc` -> 100 %
+- dry ADC value -> 0 %
+- wet ADC value -> 100 %
 
-The values may be in either numerical order. A minimum span is required to avoid an invalid calibration.
 
-## HTTP API
+## User interface behavior
 
-### Current value
+The web interface keeps the established layout of the predecessor firmware: dark top bar, fixed left navigation, light content area and compact white status cards.
+
+Live status polling runs automatically only while the **Status** page is active. Configuration fields are not periodically overwritten while the user is editing them. This prevents Wi-Fi credentials and other settings from being reset in the browser before they are saved.
+
+## Web interface
+
+The user interface contains only functions needed by this project:
+
+- Status
+- Sensor
+- System settings
+- System log
+- OTA Update
+- Factory reset
+
+The Status page shows:
+
+- current soil moisture
+- raw ADC value
+- signal pin
+- dry/wet calibration values
+- last measurement
+- measurement interval
+- local time / NTP
+- IP address
+- Wi-Fi RSSI
+- uptime
+- free heap
+- firmware version
+
+## GrowTent backend API
+
+### Current values
 
 `GET /api/current-values`
 
@@ -55,67 +102,38 @@ Example:
   "device": "SoilSensor-1",
   "sensor": "Topf 1",
   "signal_pin": "A0",
-  "firmware_version": "0.1.3",
+  "firmware_version": "0.1.6",
   "raw_adc": 487,
   "moisture_percent": 63.4,
   "calibrated": true,
-  "last_measurement_at": "2026-10-05 21:10:00",
+  "last_measurement_at": "2026-10-06 12:30:00",
   "wifi_rssi": -57,
   "uptime_seconds": 86423
 }
 ```
 
-This is the endpoint intended for the GrowTent backend.
-
 ### Health
 
 `GET /api/health`
 
-Returns sensor, calibration, Wi-Fi and time status.
-
-### UI state
-
-`GET /api/state`
-
-Used by the local web interface.
-
-## Web interface
-
-Pages/tabs:
-
-- Status
-- Sensor
-- System
-- System log
-- OTA
-- Factory reset
-
-Features:
-
-- German / English
-- light / dark theme
-- sensor name
-- configurable signal pin
-- measurement interval
-- sample count
-- dry/wet calibration buttons
-- Wi-Fi settings
-- NTP settings
-- OTA
-- factory reset
-
 ## Wi-Fi fallback AP
 
-If no Wi-Fi is configured or station connection fails, the ESP opens a fallback AP.
+If no normal Wi-Fi connection can be established, the device starts its setup access point.
 
 ```text
 SSID:     MoistureSensor-<CHIPID>
 Password: MS-Setup-8266
 ```
 
-Open the ESP address shown by the client network information, normally `192.168.4.1`.
+Default device name:
 
-The fallback AP is disabled after the station connection has been stable for 10 seconds and is re-enabled after a longer disconnect.
+```text
+SoilSensor-1
+```
+
+The default AP address is normally:
+
+`192.168.4.1`
 
 ## NTP
 
@@ -126,125 +144,48 @@ Server:   de.pool.ntp.org
 Timezone: CET-1CEST,M3.5.0,M10.5.0/3
 ```
 
-NTP setup is initiated at each boot. The firmware does not block indefinitely waiting for time synchronization.
-
-## Persistent settings
-
-EEPROM emulation stores:
-
-- Wi-Fi SSID/password
-- device name
-- sensor name
-- signal pin
-- dry/wet ADC calibration
-- measurement interval
-- sample count
-- NTP server
-- POSIX timezone
-- language
-- theme
-
-Measurements themselves are RAM-only.
-
-## OTA
-
-OTA follows the same browser-assisted concept used by ESP8266 Moisture Sensor:
-
-1. the browser requests the OTA manifest from the repository `ota` branch
-2. the browser downloads `firmware.bin`
-3. SHA-256 and size are checked in the browser when supplied by the manifest
-4. the browser uploads the verified binary to the ESP8266
-5. the ESP flashes the firmware and reboots
-
-Repository:
-
-`syschelle/esp8266-moisture-sensor--for-growtend-backend`
-
-OTA branch:
-
-`ota`
-
-Manifest URL:
-
-`https://raw.githubusercontent.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/ota/manifest.json`
-
-
-## GitHub Actions firmware artifact
-
-Every build on `main`, every pull request, and every manually started workflow performs:
-
-1. static project validation
-2. PlatformIO build for `d1_mini`
-3. creation of the OTA package
-4. upload of the generated firmware package as a GitHub Actions artifact
-
-After a successful workflow run, open the run summary and download:
-
-`esp8266-moisture-sensor-v0.1.3`
-
-The artifact contains:
-
-- `firmware.bin`
-- `firmware.bin.sha256`
-- `manifest.json`
-- `README.md`
-
-The workflow uses a fixed `ubuntu-24.04` runner image rather than `ubuntu-latest`.
-
-
-## GitHub Release assets
-
-When a version tag such as `v0.1.3` is pushed, GitHub Actions now also creates or updates the matching GitHub Release and uploads the built firmware directly to **Releases -> Assets**.
-
-Release assets:
-
-- `firmware.bin`
-- `firmware.bin.sha256`
-- `manifest.json`
-- `README.md`
-
-This is in addition to the downloadable GitHub Actions artifact from the workflow run.
-
 ## Build
-
-PlatformIO:
 
 ```powershell
 pio run -e d1_mini
 ```
 
-USB upload:
+## GitHub firmware release assets
 
-```powershell
-pio run -e d1_mini -t upload
-```
+Pushing a version tag triggers a firmware build. The GitHub Release receives:
 
-Serial monitor:
+- `firmware.bin`
+- `firmware.bin.sha256`
+- `manifest.json`
+- `README.md`
 
-```powershell
-pio device monitor
-```
+## OTA
 
-## First commissioning
+OTA uses the latest published GitHub Release of this repository. No separate `ota` branch is required.
 
-1. Wire the sensor.
-2. Flash firmware over USB.
-3. Connect to `MoistureSensor-<CHIPID>` using password `MS-Setup-8266`.
-4. Open `http://192.168.4.1`.
-5. Configure Wi-Fi and reboot.
-6. Open the sensor's normal LAN IP.
-7. Calibrate dry.
-8. Put the sensor into representative well-watered soil and calibrate wet.
-9. Verify `/api/current-values`.
+Manifest:
 
-## Repository release documents
+`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/manifest.json`
 
-Only the current source version is kept in:
+Firmware:
 
-- `BUILD_STATUS.md`
-- `RELEASE_NOTES.md`
+`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/firmware.bin`
 
-Historical version-specific copies are intentionally not created. GitHub Releases are the release history.
+The browser-assisted update process is:
+
+1. load `manifest.json` from the latest GitHub Release
+2. compare the release version with the installed firmware
+3. download `firmware.bin`
+4. verify file size and SHA-256 from the manifest
+5. upload the verified firmware to the ESP8266 over the local HTTP connection
+6. reboot after a successful flash
+
+The release workflow publishes these files directly under **GitHub Releases -> Assets**:
+
+- `firmware.bin`
+- `firmware.bin.sha256`
+- `manifest.json`
+- `README.md`
 
 ## License
 

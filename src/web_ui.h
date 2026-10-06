@@ -9,184 +9,312 @@ static const char WEB_UI[] PROGMEM = R"HTML(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ESP8266 Moisture Sensor</title>
 <style>
-:root{--bg:#eef2ff;--card:#fff;--fg:#172033;--muted:#65718a;--line:#dbe2f0;--accent:#2563eb;--good:#15803d;--warn:#b45309;--bad:#b91c1c;--shadow:0 8px 24px rgba(15,23,42,.08)}
-:root[data-theme="dark"]{--bg:#0f172a;--card:#162033;--fg:#e5edf8;--muted:#9aabc2;--line:#2a3850;--accent:#60a5fa;--good:#4ade80;--warn:#fbbf24;--bad:#f87171;--shadow:none}
-*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.brand{font-weight:800}.sub{color:var(--muted);font-size:12px}.wrap{max-width:1050px;margin:0 auto;padding:20px}
-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}.tab{border:1px solid var(--line);background:var(--card);color:var(--fg);padding:9px 13px;border-radius:10px;cursor:pointer}
-.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}.title{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.value{font-size:30px;font-weight:800;margin-top:5px}.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}
-label{display:block;margin:12px 0 5px;font-weight:650}input,select{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--fg)}
-button{border:0;background:var(--accent);color:#fff;padding:10px 14px;border-radius:9px;cursor:pointer;font-weight:700}button.secondary{background:transparent;color:var(--fg);border:1px solid var(--line)}button.danger{background:var(--bad)}
-.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}.hint{color:var(--muted);font-size:12px;margin-top:7px}.ok{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-section{display:none}section.active{display:block}pre{background:#08111f;color:#d6e4f0;padding:14px;border-radius:10px;overflow:auto;max-height:420px;white-space:pre-wrap}
-.progress{height:10px;background:var(--line);border-radius:999px;overflow:hidden;margin-top:9px}.progress>span{display:block;height:100%;background:var(--accent);width:0}
-.bigmoist{font-size:56px;font-weight:900;line-height:1}.footer{color:var(--muted);text-align:center;padding:20px}
-@media(max-width:650px){.wrap{padding:12px}.value{font-size:25px}.bigmoist{font-size:46px}}
+:root{--top:#2f465c;--side:#38546d;--side-active:#314b63;--bg:#f4f4f4;--card:#fff;--text:#222;--muted:#858585;--line:#dcdcdc;--good:#087b35;--warn:#b66b00;--bad:#b42318;--primary:#2f65d9;--shadow:0 2px 7px rgba(0,0,0,.10)}
+:root[data-theme="dark"]{--top:#1f2e3c;--side:#293f52;--side-active:#213547;--bg:#121920;--card:#1a232c;--text:#edf2f7;--muted:#9da8b2;--line:#34414c;--good:#45c976;--warn:#f0b84b;--bad:#ef6a6a;--primary:#6da8ff;--shadow:none}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.topbar{height:49px;background:var(--top);color:#fff;display:flex;align-items:center;padding:0 12px;font-weight:700;position:fixed;top:0;left:0;right:0;z-index:20}
+.brand{font-size:15px}
+.sidebar{position:fixed;left:0;top:49px;bottom:0;width:205px;background:var(--side);padding-top:7px;z-index:15}
+.navbtn{display:block;width:100%;border:0;background:transparent;color:#fff;text-align:left;padding:14px 13px;font-size:15px;cursor:pointer}
+.navbtn:hover,.navbtn.active{background:var(--side-active)}
+.content{margin-left:205px;padding:38px 32px 40px;min-height:100vh}
+.page{display:none}.page.active{display:block}
+.headrow{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:29px}
+h1{font-size:30px;line-height:1.2;margin:0 0 17px;font-weight:700}
+h2{font-size:18px;margin:0 0 15px;font-weight:700}
+.subtitle{color:var(--muted);font-size:15px}
+.badge{border:1px solid var(--line);border-radius:18px;padding:5px 11px;font-size:12px;font-weight:700;white-space:nowrap;background:transparent}
+.badge.good{color:var(--good);border-color:var(--good)}.badge.warn{color:var(--warn);border-color:var(--warn)}.badge.bad{color:var(--bad);border-color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:16px}
+.hero{margin-bottom:15px;padding:20px 18px 18px}
+.hero-label{font-size:12px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
+.hero-value{font-size:48px;font-weight:800;letter-spacing:2px;margin:28px 0 15px}
+.hero-bottom{display:flex;align-items:center;justify-content:space-between;gap:15px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:9px 0;border-bottom:1px solid var(--line);min-height:37px}
+.row:last-child{border-bottom:0}.row span:first-child{color:var(--muted)}.row b{font-weight:400;text-align:right;overflow-wrap:anywhere}
+label{display:block;margin:14px 0 6px;font-weight:600}
+input,select{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text);font:inherit}
+input:focus,select:focus{outline:2px solid rgba(47,101,217,.18);border-color:var(--primary)}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+button.action{border:0;border-radius:7px;padding:10px 14px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer}
+button.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}button.danger{background:var(--bad)}
+.hint{color:var(--muted);font-size:12px;margin-top:7px}.saveState{font-size:12px;margin-top:10px;color:var(--muted)}
+pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:7px;overflow:auto;max-height:520px;white-space:pre-wrap}
+.progress{height:9px;background:var(--line);border-radius:999px;overflow:hidden;margin-top:15px}.progress span{display:block;height:100%;width:0;background:var(--primary)}
+@media(max-width:850px){.sidebar{width:175px}.content{margin-left:175px;padding:26px 18px}.grid2{grid-template-columns:1fr}}
+@media(max-width:620px){.topbar{position:static}.sidebar{position:static;width:auto;display:flex;overflow:auto;padding:0}.navbtn{width:auto;white-space:nowrap;padding:12px}.content{margin-left:0;padding:18px 12px}.headrow{margin-bottom:18px}.hero-value{font-size:40px}}
 </style>
 </head>
 <body>
-<header>
-  <div><div class="brand" id="headerName">ESP8266 Moisture Sensor</div><div class="sub" id="headerMeta">...</div></div>
-  <button class="secondary" onclick="toggleTheme()" id="themeBtn">◐</button>
-</header>
-<div class="wrap">
-<nav>
- <button class="tab active" data-tab="status">Status</button>
- <button class="tab" data-tab="sensor">Sensor</button>
- <button class="tab" data-tab="system">System</button>
- <button class="tab" data-tab="log">Systemprotokoll</button>
- <button class="tab" data-tab="ota">OTA</button>
- <button class="tab" data-tab="reset">Werkseinstellungen</button>
-</nav>
-
-<section id="status" class="active">
- <div class="grid">
-  <div class="card"><div class="title" data-i18n="moisture">Bodenfeuchte</div><div class="bigmoist" id="moisture">-- %</div><div class="hint" id="moistState">...</div></div>
-  <div class="card"><div class="title">ADC</div><div class="value" id="raw">--</div><div class="hint" id="pin">A0</div></div>
-  <div class="card"><div class="title">WLAN</div><div class="value" id="rssi">-- dBm</div><div class="hint" id="ip">--</div></div>
-  <div class="card"><div class="title" data-i18n="lastMeasurement">Letzte Messung</div><div class="value" style="font-size:18px" id="last">--</div><div class="hint" id="uptime">--</div></div>
- </div>
- <div class="card" style="margin-top:14px">
-  <div class="row"><span data-i18n="device">Gerät</span><b id="devName">--</b></div>
-  <div class="row"><span data-i18n="sensorName">Sensorname</span><b id="statusSensorName">--</b></div>
-  <div class="row"><span data-i18n="firmware">Firmware</span><b id="fw">--</b></div>
-  <div class="row"><span>NTP</span><b id="ntp">--</b></div>
-  <div class="row"><span>API</span><b>/api/current-values</b></div>
- </div>
-</section>
-
-<section id="sensor">
- <div class="card">
-  <h2 data-i18n="sensorSettings">Sensoreinstellungen</h2>
-  <label data-i18n="sensorName">Sensorname</label><input id="sensorName" maxlength="32">
-  <label data-i18n="signalPin">Signalpin</label>
-  <select id="signalPin"><option value="A0">A0 (ADC)</option></select>
-  <div class="hint" data-i18n="pinHint">Der ESP8266 besitzt nur einen analogen Eingang. Die Einstellung ist bereits so angelegt, dass spätere Plattformen mehrere ADC-Pins anbieten können.</div>
-  <label data-i18n="measureInterval">Messintervall (Sekunden)</label><input id="interval" type="number" min="1" max="300">
-  <label data-i18n="sampleCount">Messungen pro Mittelwert</label><input id="samples" type="number" min="1" max="50">
-  <div class="actions"><button onclick="saveSensor()" data-i18n="save">Speichern</button></div>
- </div>
- <div class="card" style="margin-top:14px">
-  <h2 data-i18n="calibration">Kalibrierung</h2>
-  <div class="row"><span data-i18n="dryValue">Trockenwert</span><b id="dryVal">--</b></div>
-  <div class="row"><span data-i18n="wetValue">Nasswert</span><b id="wetVal">--</b></div>
-  <div class="row"><span>ADC live</span><b id="liveRaw">--</b></div>
-  <div class="actions">
-    <button onclick="calibrate('dry')" data-i18n="takeDry">Aktuellen Wert als TROCKEN speichern</button>
-    <button onclick="calibrate('wet')" data-i18n="takeWet">Aktuellen Wert als NASS speichern</button>
-  </div>
-  <div class="hint" data-i18n="calHint">Für die Trocken-Kalibrierung den Sensor trocken messen. Für Nass den Sensor in gut befeuchteter Erde messen. Die Werte müssen ausreichend auseinander liegen.</div>
- </div>
-</section>
-
-<section id="system">
- <div class="card">
-  <h2 data-i18n="systemSettings">Systemeinstellungen</h2>
-  <label data-i18n="deviceName">Gerätename</label><input id="deviceName" maxlength="32">
-  <label>Wi-Fi SSID</label><input id="ssid" maxlength="32">
-  <label data-i18n="wifiPass">Wi-Fi Passwort</label><input id="wifiPass" type="password" maxlength="64" placeholder="********">
-  <div class="hint" data-i18n="passHint">Leer lassen, um das gespeicherte Passwort beizubehalten.</div>
-  <label>NTP Server</label><input id="ntpServer" maxlength="63">
-  <label data-i18n="timezone">Zeitzone (POSIX TZ)</label><input id="timezone" maxlength="63">
-  <label data-i18n="language">Sprache</label><select id="language"><option value="de">Deutsch</option><option value="en">English</option></select>
-  <label>Theme</label><select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select>
-  <div class="actions"><button onclick="saveSystem()" data-i18n="save">Speichern</button><button class="secondary" onclick="reboot()" data-i18n="reboot">Neustart</button></div>
- </div>
-</section>
-
-<section id="log">
- <div class="card"><div class="actions" style="margin-top:0"><button class="secondary" onclick="loadLog()" data-i18n="refresh">Aktualisieren</button></div><pre id="logText">...</pre></div>
-</section>
-
-<section id="ota">
- <div class="card">
-  <h2>OTA Update</h2>
-  <div class="row"><span data-i18n="installed">Installiert</span><b id="otaCurrent">--</b></div>
-  <div class="row"><span data-i18n="available">Verfügbar</span><b id="otaAvailable">--</b></div>
-  <div class="actions"><button onclick="checkOta()" data-i18n="checkUpdate">Update prüfen</button></div>
-  <div class="progress"><span id="otaProgress"></span></div>
-  <div class="hint" id="otaMsg"></div>
- </div>
- <div class="card" style="margin-top:14px">
-  <h3 data-i18n="manualUpdate">Manuelles Firmware-Update</h3>
-  <input id="fwFile" type="file" accept=".bin,application/octet-stream">
-  <div class="actions"><button onclick="manualUpload()" data-i18n="uploadFirmware">Firmware hochladen</button></div>
- </div>
-</section>
-
-<section id="reset">
- <div class="card">
-  <h2 data-i18n="factoryReset">Werkseinstellungen</h2>
-  <p data-i18n="resetText">Alle gespeicherten Einstellungen einschließlich WLAN und Kalibrierung werden gelöscht.</p>
-  <button class="danger" onclick="factoryReset()" data-i18n="resetButton">Werkseinstellungen laden</button>
- </div>
-</section>
-<div class="footer" id="footer">ESP8266 Moisture Sensor</div>
+<div class="topbar"><div class="brand" id="topBrand">ESP8266 Moisture Sensor</div></div>
+<div class="sidebar">
+  <button class="navbtn active" data-page="status">Status</button>
+  <button class="navbtn" data-page="sensor" data-i18n="sensor">Sensor</button>
+  <button class="navbtn" data-page="system" data-i18n="systemSettings">Systemeinstellungen</button>
+  <button class="navbtn" data-page="log" data-i18n="systemLog">Systemprotokoll</button>
+  <button class="navbtn" data-page="ota">OTA Update</button>
+  <button class="navbtn" data-page="reset" data-i18n="factory">Werkseinstellungen</button>
 </div>
+
+<main class="content">
+<section class="page active" id="status">
+  <div class="headrow">
+    <div><h1>Status</h1><div class="subtitle" data-i18n="statusSub">Lokaler Sensorstatus und aktuelle Bodenfeuchte.</div></div>
+    <span id="connBadge" class="badge warn">...</span>
+  </div>
+
+  <div class="card hero">
+    <div class="hero-label" data-i18n="currentMoisture">AKTUELLE BODENFEUCHTE</div>
+    <div class="hero-value" id="heroMoisture">-- %</div>
+    <div class="hero-bottom"><span id="heroSensor">--</span><span id="heroCal">--</span></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="headrow" style="margin-bottom:8px"><h2 data-i18n="soilSensor">Bodenfeuchtesensor</h2><span id="sensorBadge" class="badge warn">...</span></div>
+      <div class="row"><span>ADC Rohwert</span><b id="stRaw">--</b></div>
+      <div class="row"><span data-i18n="signalPin">Signalpin</span><b id="stPin">A0</b></div>
+      <div class="row"><span data-i18n="dryValue">Trockenwert</span><b id="stDry">--</b></div>
+      <div class="row"><span data-i18n="wetValue">Nasswert</span><b id="stWet">--</b></div>
+      <div class="row"><span data-i18n="lastMeasurement">Letzte Messung</span><b id="stLast">--</b></div>
+      <div class="row"><span data-i18n="interval">Messintervall</span><b id="stInterval">--</b></div>
+    </div>
+
+    <div class="card">
+      <div class="headrow" style="margin-bottom:8px"><h2>System</h2><span id="sysBadge" class="badge warn">...</span></div>
+      <div class="row"><span data-i18n="localTime">Lokale Zeit</span><b id="stTime">--</b></div>
+      <div class="row"><span>NTP</span><b id="stNtp">--</b></div>
+      <div class="row"><span data-i18n="ipAddress">IP-Adresse</span><b id="stIp">--</b></div>
+      <div class="row"><span>WLAN RSSI</span><b id="stRssi">--</b></div>
+      <div class="row"><span>Uptime</span><b id="stUptime">--</b></div>
+      <div class="row"><span>Free Heap</span><b id="stHeap">--</b></div>
+      <div class="row"><span data-i18n="firmwareVersion">Firmware-Version</span><b id="stVersion">--</b></div>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="sensor">
+  <div class="headrow"><div><h1 data-i18n="sensor">Sensor</h1><div class="subtitle" data-i18n="sensorSub">Messung und Kalibrierung des kapazitiven Bodenfeuchtesensors.</div></div></div>
+  <div class="grid2">
+    <div class="card">
+      <h2 data-i18n="sensorSettings">Sensoreinstellungen</h2>
+      <label data-i18n="sensorName">Sensorname</label><input id="sensorName" maxlength="32">
+      <label data-i18n="signalPin">Signalpin</label>
+      <select id="signalPin"><option value="A0">A0 (ADC)</option></select>
+      <div class="hint" data-i18n="pinHint">Beim ESP8266 ist A0 der analoge Sensoreingang.</div>
+      <label data-i18n="measureInterval">Messintervall (Sekunden)</label><input id="interval" type="number" min="1" max="300">
+      <label data-i18n="sampleCount">Messungen pro Mittelwert</label><input id="samples" type="number" min="1" max="50">
+      <div class="actions"><button class="action" onclick="saveSensor()" data-i18n="save">Speichern</button></div><div id="sensorSaveState" class="saveState"></div>
+    </div>
+    <div class="card">
+      <h2 data-i18n="calibration">Kalibrierung</h2>
+      <div class="row"><span>ADC live</span><b id="liveRaw">--</b></div>
+      <div class="row"><span data-i18n="dryValue">Trockenwert</span><b id="dryVal">--</b></div>
+      <div class="row"><span data-i18n="wetValue">Nasswert</span><b id="wetVal">--</b></div>
+      <div class="row"><span data-i18n="moisture">Bodenfeuchte</span><b id="calMoist">--</b></div>
+      <div class="actions">
+        <button class="action" onclick="calibrate('dry')" data-i18n="takeDry">Aktuellen Wert als TROCKEN speichern</button>
+        <button class="action" onclick="calibrate('wet')" data-i18n="takeWet">Aktuellen Wert als NASS speichern</button>
+      </div>
+      <div class="hint" data-i18n="calHint">Trocken und nass müssen ausreichend unterschiedliche ADC-Werte liefern.</div>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="system">
+  <div class="headrow"><div><h1 data-i18n="systemSettings">Systemeinstellungen</h1><div class="subtitle" data-i18n="systemSub">WLAN, Gerätename, NTP und Oberfläche konfigurieren.</div></div></div>
+  <div class="card">
+    <label data-i18n="deviceName">Gerätename</label><input id="deviceName" maxlength="32">
+    <label>Wi-Fi SSID</label><input id="ssid" maxlength="32">
+    <label data-i18n="wifiPassword">Wi-Fi Passwort</label><input id="wifiPass" type="password" maxlength="64" placeholder="********">
+    <div class="hint" data-i18n="passwordHint">Leer lassen, um das gespeicherte Passwort beizubehalten.</div>
+    <label>NTP Server</label><input id="ntpServer" maxlength="63">
+    <label data-i18n="timezone">Zeitzone (POSIX TZ)</label><input id="timezone" maxlength="63">
+    <label data-i18n="language">Sprache</label><select id="language"><option value="de">Deutsch</option><option value="en">English</option></select>
+    <label>Theme</label><select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select>
+    <div class="actions"><button class="action" onclick="saveSystem()" data-i18n="save">Speichern</button><button class="action secondary" onclick="reboot()" data-i18n="reboot">Neustart</button></div><div id="systemSaveState" class="saveState"></div>
+  </div>
+</section>
+
+<section class="page" id="log">
+  <div class="headrow"><div><h1 data-i18n="systemLog">Systemprotokoll</h1></div></div>
+  <div class="card"><button class="action secondary" onclick="loadLog()" data-i18n="refresh">Aktualisieren</button><pre id="logText">...</pre></div>
+</section>
+
+<section class="page" id="ota">
+  <div class="headrow"><div><h1>OTA Update</h1><div class="subtitle" data-i18n="otaSub">Firmware aktualisieren.</div></div></div>
+  <div class="card">
+    <div class="row"><span data-i18n="installed">Installiert</span><b id="otaCurrent">--</b></div>
+    <div class="row"><span data-i18n="available">Verfügbar</span><b id="otaAvailable">--</b></div>
+    <div class="actions"><button class="action" onclick="checkOta()" data-i18n="checkUpdate">Update prüfen</button></div>
+    <div class="progress"><span id="otaProgress"></span></div>
+    <div class="hint" id="otaMsg"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h2 data-i18n="manualUpdate">Manuelles Firmware-Update</h2>
+    <input id="fwFile" type="file" accept=".bin,application/octet-stream">
+    <div class="actions"><button class="action" onclick="manualUpload()" data-i18n="uploadFirmware">Firmware hochladen</button></div>
+  </div>
+</section>
+
+<section class="page" id="reset">
+  <div class="headrow"><div><h1 data-i18n="factory">Werkseinstellungen</h1></div></div>
+  <div class="card">
+    <p data-i18n="resetText">Alle gespeicherten Einstellungen einschließlich WLAN und Sensorkalibrierung werden gelöscht.</p>
+    <button class="action danger" onclick="factoryReset()" data-i18n="resetButton">Werkseinstellungen laden</button>
+  </div>
+</section>
+</main>
+
 <script>
-let S={}, lang='de';
+let S={},lang='de',activePage='status',formDirty=false,saveInProgress=false;
 const T={
-de:{moisture:'Bodenfeuchte',lastMeasurement:'Letzte Messung',device:'Gerät',sensorName:'Sensorname',firmware:'Firmware',sensorSettings:'Sensoreinstellungen',signalPin:'Signalpin',pinHint:'Der ESP8266 besitzt nur einen analogen Eingang. Die Einstellung ist bereits so angelegt, dass spätere Plattformen mehrere ADC-Pins anbieten können.',measureInterval:'Messintervall (Sekunden)',sampleCount:'Messungen pro Mittelwert',save:'Speichern',calibration:'Kalibrierung',dryValue:'Trockenwert',wetValue:'Nasswert',takeDry:'Aktuellen Wert als TROCKEN speichern',takeWet:'Aktuellen Wert als NASS speichern',calHint:'Für die Trocken-Kalibrierung den Sensor trocken messen. Für Nass den Sensor in gut befeuchteter Erde messen. Die Werte müssen ausreichend auseinander liegen.',systemSettings:'Systemeinstellungen',deviceName:'Gerätename',wifiPass:'Wi-Fi Passwort',passHint:'Leer lassen, um das gespeicherte Passwort beizubehalten.',timezone:'Zeitzone (POSIX TZ)',language:'Sprache',reboot:'Neustart',refresh:'Aktualisieren',installed:'Installiert',available:'Verfügbar',checkUpdate:'Update prüfen',manualUpdate:'Manuelles Firmware-Update',uploadFirmware:'Firmware hochladen',factoryReset:'Werkseinstellungen',resetText:'Alle gespeicherten Einstellungen einschließlich WLAN und Kalibrierung werden gelöscht.',resetButton:'Werkseinstellungen laden'},
-en:{moisture:'Soil moisture',lastMeasurement:'Last measurement',device:'Device',sensorName:'Sensor name',firmware:'Firmware',sensorSettings:'Sensor settings',signalPin:'Signal pin',pinHint:'The ESP8266 has only one analog input. The setting is already structured so later platforms can expose multiple ADC pins.',measureInterval:'Measurement interval (seconds)',sampleCount:'Samples per average',save:'Save',calibration:'Calibration',dryValue:'Dry value',wetValue:'Wet value',takeDry:'Store current value as DRY',takeWet:'Store current value as WET',calHint:'For dry calibration measure the sensor dry. For wet calibration measure it in well-watered soil. The two values must be sufficiently different.',systemSettings:'System settings',deviceName:'Device name',wifiPass:'Wi-Fi password',passHint:'Leave empty to keep the stored password.',timezone:'Timezone (POSIX TZ)',language:'Language',reboot:'Reboot',refresh:'Refresh',installed:'Installed',available:'Available',checkUpdate:'Check for update',manualUpdate:'Manual firmware update',uploadFirmware:'Upload firmware',factoryReset:'Factory reset',resetText:'All stored settings including Wi-Fi and calibration will be erased.',resetButton:'Restore factory settings'}
-};
-function tr(){document.querySelectorAll('[data-i18n]').forEach(e=>{let k=e.dataset.i18n;if(T[lang]&&T[lang][k])e.textContent=T[lang][k]})}
-function setTheme(t){document.documentElement.dataset.theme=t||'light'}
-function toggleTheme(){let t=document.documentElement.dataset.theme==='dark'?'light':'dark';setTheme(t);document.getElementById('theme').value=t}
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('section').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.tab).classList.add('active');if(b.dataset.tab==='log')loadLog()});
-async function api(url,opt){let r=await fetch(url,opt);let txt=await r.text();let j={};try{j=JSON.parse(txt)}catch(e){} if(!r.ok)throw Error(j.error||txt||('HTTP '+r.status));return j}
-function fmtUptime(s){s=Number(s||0);let d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return (d?d+'d ':'')+h+'h '+m+'m'}
-async function loadState(){
- try{
-  S=await api('/api/state');
-  lang=S.settings.language||'de'; tr(); setTheme(S.settings.theme||'light');
-  headerName.textContent=S.settings.device_name; headerMeta.textContent=(S.wifi.connected?S.wifi.ip:'AP '+S.wifi.ap_ip)+' · '+S.version;
-  moisture.textContent=S.sensor.valid?S.sensor.moisture_percent.toFixed(1)+' %':'-- %';
-  moistState.textContent=S.sensor.calibrated?(S.sensor.valid?'OK':'Warte auf Messung'):'Kalibrierung erforderlich';
-  moistState.className='hint '+(S.sensor.calibrated?'ok':'warn');
-  raw.textContent=S.sensor.valid?S.sensor.raw_adc:'--'; liveRaw.textContent=raw.textContent; pin.textContent=S.settings.signal_pin;
-  rssi.textContent=S.wifi.connected?S.wifi.rssi+' dBm':'-- dBm'; ip.textContent=S.wifi.connected?S.wifi.ip:'AP: '+S.wifi.ap_ip;
-  last.textContent=S.sensor.last_measurement_local||'--'; uptime.textContent='Uptime: '+fmtUptime(S.uptime_seconds);
-  devName.textContent=S.settings.device_name; statusSensorName.textContent=S.settings.sensor_name; fw.textContent=S.version; ntp.textContent=S.time.valid?'OK':'wartet';
-  sensorName.value=S.settings.sensor_name; signalPin.value=S.settings.signal_pin; interval.value=S.settings.measure_interval_seconds; samples.value=S.settings.sample_count;
-  dryVal.textContent=S.settings.dry_adc; wetVal.textContent=S.settings.wet_adc;
-  deviceName.value=S.settings.device_name; ssid.value=S.settings.ssid; ntpServer.value=S.settings.ntp_server; timezone.value=S.settings.timezone; language.value=S.settings.language; theme.value=S.settings.theme;
-  otaCurrent.textContent=S.version; footer.textContent='ESP8266 Moisture Sensor '+S.version;
- }catch(e){headerMeta.textContent=e.message}
-}
+de:{
+ sensor:'Sensor',systemSettings:'Systemeinstellungen',systemLog:'Systemprotokoll',factory:'Werkseinstellungen',
+ statusSub:'Lokaler Sensorstatus und aktuelle Bodenfeuchte.',currentMoisture:'AKTUELLE BODENFEUCHTE',
+ soilSensor:'Bodenfeuchtesensor',signalPin:'Signalpin',dryValue:'Trockenwert',wetValue:'Nasswert',
+ lastMeasurement:'Letzte Messung',interval:'Messintervall',localTime:'Lokale Zeit',ipAddress:'IP-Adresse',
+ firmwareVersion:'Firmware-Version',sensorSub:'Messung und Kalibrierung des kapazitiven Bodenfeuchtesensors.',
+ sensorSettings:'Sensoreinstellungen',sensorName:'Sensorname',pinHint:'Beim ESP8266 ist A0 der analoge Sensoreingang.',
+ measureInterval:'Messintervall (Sekunden)',sampleCount:'Messungen pro Mittelwert',save:'Speichern',
+ calibration:'Kalibrierung',moisture:'Bodenfeuchte',takeDry:'Aktuellen Wert als TROCKEN speichern',
+ takeWet:'Aktuellen Wert als NASS speichern',calHint:'Trocken und nass müssen ausreichend unterschiedliche ADC-Werte liefern.',
+ systemSub:'WLAN, Gerätename, NTP und Oberfläche konfigurieren.',deviceName:'Gerätename',wifiPassword:'Wi-Fi Passwort',
+ passwordHint:'Leer lassen, um das gespeicherte Passwort beizubehalten.',timezone:'Zeitzone (POSIX TZ)',language:'Sprache',
+ reboot:'Neustart',refresh:'Aktualisieren',otaSub:'Firmware aktualisieren.',installed:'Installiert',available:'Verfügbar',
+ checkUpdate:'Update prüfen',manualUpdate:'Manuelles Firmware-Update',uploadFirmware:'Firmware hochladen',
+ resetText:'Alle gespeicherten Einstellungen einschließlich WLAN und Sensorkalibrierung werden gelöscht.',
+ resetButton:'Werkseinstellungen laden',connected:'Verbunden',apMode:'AP-Modus',offline:'Nicht erreichbar',
+ calibrated:'Kalibriert',notCalibrated:'Nicht kalibriert',active:'Aktiv',waiting:'Warte auf Messung',synchronized:'Synchronisiert',waitingNtp:'Wartet'
+},
+en:{
+ sensor:'Sensor',systemSettings:'System settings',systemLog:'System log',factory:'Factory reset',
+ statusSub:'Local sensor status and current soil moisture.',currentMoisture:'CURRENT SOIL MOISTURE',
+ soilSensor:'Soil moisture sensor',signalPin:'Signal pin',dryValue:'Dry value',wetValue:'Wet value',
+ lastMeasurement:'Last measurement',interval:'Measurement interval',localTime:'Local time',ipAddress:'IP address',
+ firmwareVersion:'Firmware version',sensorSub:'Measurement and calibration of the capacitive soil-moisture sensor.',
+ sensorSettings:'Sensor settings',sensorName:'Sensor name',pinHint:'On ESP8266, A0 is the analog sensor input.',
+ measureInterval:'Measurement interval (seconds)',sampleCount:'Samples per average',save:'Save',
+ calibration:'Calibration',moisture:'Soil moisture',takeDry:'Store current value as DRY',
+ takeWet:'Store current value as WET',calHint:'Dry and wet must provide sufficiently different ADC values.',
+ systemSub:'Configure Wi-Fi, device name, NTP and user interface.',deviceName:'Device name',wifiPassword:'Wi-Fi password',
+ passwordHint:'Leave empty to keep the stored password.',timezone:'Timezone (POSIX TZ)',language:'Language',
+ reboot:'Reboot',refresh:'Refresh',otaSub:'Update firmware.',installed:'Installed',available:'Available',
+ checkUpdate:'Check for update',manualUpdate:'Manual firmware update',uploadFirmware:'Upload firmware',
+ resetText:'All saved settings including Wi-Fi and sensor calibration will be erased.',
+ resetButton:'Restore factory settings',connected:'Connected',apMode:'AP mode',offline:'Offline',
+ calibrated:'Calibrated',notCalibrated:'Not calibrated',active:'Active',waiting:'Waiting for measurement',synchronized:'Synchronized',waitingNtp:'Waiting'
+}};
+function tr(k){return (T[lang]&&T[lang][k])||k}
+function applyI18n(){document.querySelectorAll('[data-i18n]').forEach(e=>e.textContent=tr(e.dataset.i18n))}
+function setTheme(v){document.documentElement.dataset.theme=v||'light'}
+document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.navbtn').forEach(x=>x.classList.remove('active'));
+ document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+ b.classList.add('active');activePage=b.dataset.page;document.getElementById(activePage).classList.add('active');
+ if(activePage==='log')loadLog();
+ if(activePage==='status'){formDirty=false;loadState(true)}
+});
+async function api(url,opt){let r=await fetch(url,opt);let tx=await r.text(),j={};try{j=JSON.parse(tx)}catch(e){}if(!r.ok)throw Error(j.error||tx||('HTTP '+r.status));return j}
 async function postForm(url,data){return api(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(data)})}
-async function saveSensor(){try{await postForm('/api/settings/sensor',{sensor_name:sensorName.value,signal_pin:signalPin.value,interval:interval.value,samples:samples.value});await loadState();alert('OK')}catch(e){alert(e.message)}}
-async function saveSystem(){try{await postForm('/api/settings/system',{device_name:deviceName.value,ssid:ssid.value,wifi_password:wifiPass.value,ntp_server:ntpServer.value,timezone:timezone.value,language:language.value,theme:theme.value});alert(lang==='de'?'Gespeichert. Neustart bei geänderten WLAN-Daten empfohlen.':'Saved. Reboot recommended after Wi-Fi changes.');await loadState()}catch(e){alert(e.message)}}
+function uptime(s){s=Number(s||0);let d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return(d?d+' d ':'')+h+' h '+m+' min'}
+function badge(el,text,cls){el.textContent=text;el.className='badge '+cls}
+function pct(v){return(v===null||v===undefined)?'-- %':Number(v).toFixed(1)+' %'}
+async function loadState(forceFormFill=false){
+ try{
+   S=await api('/api/state');lang=S.settings.language||'de';applyI18n();setTheme(S.settings.theme||'light');
+   topBrand.textContent=S.settings.device_name||'ESP8266 Moisture Sensor';
+
+   let connected=!!S.wifi.connected, ap=!!S.wifi.ap_active;
+   if(connected)badge(connBadge,tr('connected'),'good');else if(ap)badge(connBadge,tr('apMode'),'warn');else badge(connBadge,tr('offline'),'bad');
+   badge(sysBadge,connected?tr('connected'):(ap?tr('apMode'):tr('offline')),connected?'good':(ap?'warn':'bad'));
+
+   heroMoisture.textContent=S.sensor.valid?pct(S.sensor.moisture_percent):'-- %';
+   heroSensor.textContent=S.settings.sensor_name||'--';
+   heroCal.textContent=S.sensor.calibrated?tr('calibrated'):tr('notCalibrated');
+   badge(sensorBadge,S.sensor.valid?tr('active'):tr('waiting'),S.sensor.valid?'good':'warn');
+
+   stRaw.textContent=S.sensor.valid?S.sensor.raw_adc:'--';
+   stPin.textContent=S.settings.signal_pin||'A0';
+   stDry.textContent=S.settings.dry_adc;
+   stWet.textContent=S.settings.wet_adc;
+   stLast.textContent=S.sensor.last_measurement_local||'--';
+   stInterval.textContent=S.settings.measure_interval_seconds+' s';
+
+   stTime.textContent=(S.time&&S.time.local)||'--';
+   stNtp.textContent=(S.time&&S.time.valid)?tr('synchronized'):tr('waitingNtp');
+   stIp.textContent=connected?S.wifi.ip:(ap?S.wifi.ap_ip:'--');
+   stRssi.textContent=connected?(S.wifi.rssi+' dBm'):'--';
+   stUptime.textContent=uptime(S.uptime_seconds);
+   stHeap.textContent=(S.free_heap||0)+' B';
+   stVersion.textContent='v'+String(S.version||'').replace(/^v/,'');
+   liveRaw.textContent=S.sensor.valid?S.sensor.raw_adc:'--';
+   dryVal.textContent=S.settings.dry_adc;wetVal.textContent=S.settings.wet_adc;
+   calMoist.textContent=S.sensor.valid?pct(S.sensor.moisture_percent):'--';
+
+   if(forceFormFill || (!formDirty && !saveInProgress)){
+     sensorName.value=S.settings.sensor_name||'';signalPin.value=S.settings.signal_pin||'A0';
+     interval.value=S.settings.measure_interval_seconds;samples.value=S.settings.sample_count;
+     deviceName.value=S.settings.device_name||'';ssid.value=S.settings.ssid||'';
+     ntpServer.value=S.settings.ntp_server||'';timezone.value=S.settings.timezone||'';
+     language.value=S.settings.language||'de';theme.value=S.settings.theme||'light';
+   }
+   otaCurrent.textContent='v'+String(S.version||'').replace(/^v/,'');
+ }catch(e){badge(connBadge,tr('offline'),'bad')}
+}
+async function saveSensor(){
+ try{
+  saveInProgress=true;sensorSaveState.textContent=lang==='de'?'Speichere…':'Saving…';
+  await postForm('/api/settings/sensor',{sensor_name:sensorName.value,signal_pin:signalPin.value,interval:interval.value,samples:samples.value});
+  formDirty=false;sensorSaveState.textContent=lang==='de'?'Gespeichert.':'Saved.';
+  await loadState(true);
+ }catch(e){sensorSaveState.textContent=e.message;alert(e.message)}
+ finally{saveInProgress=false}
+}
+async function saveSystem(){
+ try{
+  saveInProgress=true;systemSaveState.textContent=lang==='de'?'Speichere…':'Saving…';
+  let result=await postForm('/api/settings/system',{device_name:deviceName.value,ssid:ssid.value,wifi_password:wifiPass.value,ntp_server:ntpServer.value,timezone:timezone.value,language:language.value,theme:theme.value});
+  formDirty=false;wifiPass.value='';
+  systemSaveState.textContent=result.wifi_changed?(lang==='de'?'Gespeichert. WLAN-Daten geändert – Neustart empfohlen.':'Saved. Wi-Fi changed – reboot recommended.'):(lang==='de'?'Gespeichert.':'Saved.');
+  await loadState(true);
+ }catch(e){systemSaveState.textContent=e.message;alert(e.message)}
+ finally{saveInProgress=false}
+}
 async function calibrate(which){try{await postForm('/api/calibration/'+which,{});await loadState()}catch(e){alert(e.message)}}
 async function loadLog(){try{let r=await fetch('/api/log');logText.textContent=await r.text()}catch(e){logText.textContent=e.message}}
-async function reboot(){if(confirm(lang==='de'?'ESP neu starten?':'Reboot ESP?')){await postForm('/api/reboot',{});alert('Reboot...')}}
-async function factoryReset(){if(confirm(lang==='de'?'Wirklich alle Einstellungen löschen?':'Really erase all settings?')){await postForm('/api/factory-reset',{});alert('Reset...')}}
+async function reboot(){if(confirm('Reboot?')){await postForm('/api/reboot',{})}}
+async function factoryReset(){if(confirm(lang==='de'?'Wirklich alle Einstellungen löschen?':'Really erase all settings?')){await postForm('/api/factory-reset',{})}}
 function semver(v){return String(v||'0').replace(/^v/,'').split('.').map(x=>parseInt(x,10)||0)}
 function newer(a,b){let A=semver(a),B=semver(b);for(let i=0;i<3;i++){if((A[i]||0)>(B[i]||0))return true;if((A[i]||0)<(B[i]||0))return false}return false}
 async function sha256Hex(buf){let h=await crypto.subtle.digest('SHA-256',buf);return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function uploadBuf(buf){
- otaProgress.style.width='5%';
- let blob=new Blob([buf],{type:'application/octet-stream'});let fd=new FormData();fd.append('firmware',blob,'firmware.bin');
- let r=await fetch('/api/ota/upload',{method:'POST',body:fd});
- let t=await r.text();let j={};try{j=JSON.parse(t)}catch(e){}if(!r.ok)throw Error(j.error||t||'OTA failed');
- otaProgress.style.width='100%';otaMsg.textContent='Update OK – rebooting...'
+ let blob=new Blob([buf],{type:'application/octet-stream'}),fd=new FormData();fd.append('firmware',blob,'firmware.bin');
+ otaProgress.style.width='10%';let r=await fetch('/api/ota/upload',{method:'POST',body:fd}),t=await r.text(),j={};try{j=JSON.parse(t)}catch(e){}
+ if(!r.ok)throw Error(j.error||t||'OTA failed');otaProgress.style.width='100%';otaMsg.textContent='Update OK – rebooting...'
 }
 async function checkOta(){
  try{
-  otaMsg.textContent='Manifest...';let c=await api('/api/ota/config');let m=await (await fetch(c.manifest_url,{cache:'no-store'})).json();
-  otaAvailable.textContent=m.version||'--';
+  otaMsg.textContent='Manifest...';let c=await api('/api/ota/config'),mr=await fetch(c.manifest_url,{cache:'no-store'});if(!mr.ok)throw Error('Manifest HTTP '+mr.status);
+  let m=await mr.json();otaAvailable.textContent='v'+String(m.version||'').replace(/^v/,'');
   if(!newer(m.version,S.version)){otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';return}
-  if(!confirm((lang==='de'?'Version ':'Version ')+m.version+(lang==='de'?' installieren?':' install?')))return;
-  otaMsg.textContent='Firmware download...';let rr=await fetch(m.url,{cache:'no-store'});if(!rr.ok)throw Error('Firmware HTTP '+rr.status);let buf=await rr.arrayBuffer();
+  if(!confirm('Version '+m.version+' install?'))return;
+  let rr=await fetch(m.url,{cache:'no-store'});if(!rr.ok)throw Error('Firmware HTTP '+rr.status);let buf=await rr.arrayBuffer();
   if(m.size&&Number(m.size)!==buf.byteLength)throw Error('Firmware size mismatch');
-  if(m.sha256){otaMsg.textContent='SHA-256...';let h=await sha256Hex(buf);if(h.toLowerCase()!==String(m.sha256).toLowerCase())throw Error('SHA-256 mismatch')}
+  if(m.sha256){let h=await sha256Hex(buf);if(h.toLowerCase()!==String(m.sha256).toLowerCase())throw Error('SHA-256 mismatch')}
   await uploadBuf(buf);
- }catch(e){otaMsg.textContent=e.message;otaMsg.className='hint bad'}
+ }catch(e){otaMsg.textContent=e.message}
 }
-async function manualUpload(){try{let f=fwFile.files[0];if(!f)throw Error('Select firmware.bin');await uploadBuf(await f.arrayBuffer())}catch(e){otaMsg.textContent=e.message;otaMsg.className='hint bad'}}
-loadState();setInterval(loadState,5000);
+async function manualUpload(){try{let f=fwFile.files[0];if(!f)throw Error('Select firmware.bin');await uploadBuf(await f.arrayBuffer())}catch(e){otaMsg.textContent=e.message}}
+document.querySelectorAll('#sensor input,#sensor select,#system input,#system select').forEach(el=>{
+ el.addEventListener('input',()=>{formDirty=true});
+ el.addEventListener('change',()=>{formDirty=true});
+});
+loadState(true);
+setInterval(()=>{if(activePage==='status'&&!saveInProgress)loadState(false)},5000);
 </script>
-</body></html>
+</body>
+</html>
 )HTML";

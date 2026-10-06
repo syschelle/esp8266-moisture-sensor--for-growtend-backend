@@ -1,33 +1,35 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.3
+# Build / validation status — ESP8266 Moisture Sensor v0.1.6
 
 ## Completed in the artifact environment
 
 - project structure validation: PASS
 - release version consistency: PASS
-- required API route presence: PASS
-- `A0` signal-pin validation guard: PASS
-- calibration span guard: PASS
-- Wi-Fi fallback AP configuration presence: PASS
-- default AP SSID naming guard: PASS
-- default device name guard: PASS
-- default AP password guard: PASS
-- no legacy display-project naming guard: PASS
-- OTA repository / manifest configuration presence: PASS
-- canonical release-document policy: PASS
-- JavaScript syntax check: PASS
-- GitHub Actions firmware artifact workflow validation: PASS
-- GitHub Release asset publishing workflow validation: PASS
+- current-values API route: PASS
+- health API route: PASS
+- A0 signal-pin validation: PASS
+- calibration guard: PASS
+- configuration-form refresh protection: PASS
+- GitHub Actions firmware build/artifact workflow: PASS
+- GitHub Release asset publishing workflow: PASS
+- latest-release OTA manifest URL: PASS
+- latest-release firmware URL in generated manifest: PASS
+- no OTA branch dependency: PASS
+- JavaScript syntax: PASS
 - ZIP packaging and SHA-256 generation: PASS
 
-## Runtime identity
+## OTA source
 
-Expected defaults:
+Manifest:
 
-- AP SSID: `MoistureSensor-<CHIPID>`
-- device name: `SoilSensor-1`
-- AP password: `MS-Setup-8266`
+`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/manifest.json`
 
-## Local firmware build
+Firmware:
+
+`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/firmware.bin`
+
+No separate OTA branch is required.
+
+## Local build
 
 ```powershell
 pio run -e d1_mini

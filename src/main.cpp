@@ -22,6 +22,8 @@ static constexpr uint32_t WIFI_AP_AFTER_DISCONNECT_MS = 30000;
 static constexpr uint32_t WIFI_AP_DISABLE_STABLE_MS = 10000;
 static constexpr uint32_t SAMPLE_SPACING_MS = 10;
 static constexpr size_t LOG_CAPACITY = 60;
+static constexpr size_t OTA_RECORD_OFFSET = 512;
+static constexpr uint32_t OTA_RECORD_MAGIC = 0x4F544131UL; // OTA1
 
 ESP8266WebServer server(80);
 
@@ -46,6 +48,16 @@ struct Config {
 
 Config cfg;
 
+struct OtaRecord {
+  uint32_t magic = OTA_RECORD_MAGIC;
+  char fromVersion[16] = {0};
+  char targetVersion[16] = {0};
+  uint8_t phase = 0;
+  char error[64] = {0};
+  uint32_t crc = 0;
+};
+
+
 struct SensorState {
   bool valid = false;
   bool measuring = false;
@@ -69,6 +81,11 @@ uint32_t wifiConnectedSince = 0;
 uint32_t lastWifiAttempt = 0;
 bool restartPending = false;
 uint32_t restartAt = 0;
+bool otaUpdateRequested = false;
+uint32_t otaUpdateRunAt = 0;
+String otaJobState = "idle";
+String otaJobMessage;
+String otaJobTargetVersion;
 
 static void copyText(char* dst, size_t size, const String& src) {
   if (size == 0) return;
@@ -87,6 +104,33 @@ static uint32_t crc32Bytes(const uint8_t* data, size_t len) {
 
 static uint32_t configCrc(const Config& c) {
   return crc32Bytes(reinterpret_cast<const uint8_t*>(&c), offsetof(Config, crc));
+}
+
+static uint32_t otaRecordCrc(const OtaRecord& r) {
+  return crc32Bytes(reinterpret_cast<const uint8_t*>(&r), offsetof(OtaRecord, crc));
+}
+
+static void saveOtaRecord(uint8_t phase, const String& targetVersion, const String& error = "") {
+  OtaRecord r;
+  r.magic = OTA_RECORD_MAGIC;
+  copyText(r.fromVersion, sizeof(r.fromVersion), APP_VERSION);
+  copyText(r.targetVersion, sizeof(r.targetVersion), targetVersion);
+  r.phase = phase;
+  copyText(r.error, sizeof(r.error), error);
+  r.crc = otaRecordCrc(r);
+  EEPROM.put(OTA_RECORD_OFFSET, r);
+  EEPROM.commit();
+}
+
+static bool loadOtaRecord(OtaRecord& r) {
+  EEPROM.get(OTA_RECORD_OFFSET, r);
+  return r.magic == OTA_RECORD_MAGIC && r.crc == otaRecordCrc(r);
+}
+
+static void clearOtaRecord() {
+  OtaRecord r; memset(&r, 0, sizeof(r));
+  EEPROM.put(OTA_RECORD_OFFSET, r);
+  EEPROM.commit();
 }
 
 static void defaults() {
@@ -159,6 +203,23 @@ static String allLogs() {
     out += '\n';
   }
   return out;
+}
+
+static void reportPreviousOta() {
+  OtaRecord r;
+  if (!loadOtaRecord(r)) return;
+  String from = String(r.fromVersion), target = String(r.targetVersion);
+  if (r.phase == 4 && target == APP_VERSION) {
+    addLog("OTA previous update: " + from + " -> " + target);
+    addLog("OTA previous update: firmware downloaded");
+    addLog("OTA previous update: SHA-256 verified");
+    addLog("OTA previous update: installation successful");
+  } else if (r.phase == 5) {
+    addLog("OTA previous update failed: " + String(r.error));
+  } else if (r.phase > 0) {
+    addLog("OTA previous update was interrupted at phase " + String(r.phase));
+  }
+  clearOtaRecord();
 }
 
 static bool calibrated() {
@@ -372,6 +433,9 @@ struct OtaManifest {
   size_t size = 0;
 };
 
+OtaManifest cachedOtaManifest;
+bool cachedOtaManifestValid = false;
+
 static bool parseVersionPart(const String& v, int part, int& out) {
   String s = v;
   if (s.startsWith("v")) s.remove(0, 1);
@@ -399,6 +463,7 @@ static bool isNewerVersion(const String& candidate, const String& current) {
 }
 
 static bool fetchOtaManifest(OtaManifest& out, String& error) {
+  addLog("OTA: checking latest release manifest");
   if (WiFi.status() != WL_CONNECTED) {
     error = "Wi-Fi not connected";
     return false;
@@ -442,155 +507,85 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
 
   if (!out.version.length() || !out.url.startsWith("https://") || out.sha256.length() != 64 || out.size < 1024) {
     error = "Manifest fields invalid";
+    addLog("OTA: manifest invalid");
     return false;
   }
+  addLog("OTA: manifest OK, latest version " + out.version);
   return true;
 }
 
 static bool downloadAndFlashOta(const OtaManifest& manifest, String& error) {
-  if (WiFi.status() != WL_CONNECTED) {
-    error = "Wi-Fi not connected";
-    return false;
-  }
-
+  if (WiFi.status() != WL_CONNECTED) { error = "Wi-Fi not connected"; return false; }
   size_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-  if (manifest.size > maxSketchSpace) {
-    error = "Firmware too large";
-    return false;
-  }
-
-  BearSSL::WiFiClientSecure client;
-  client.setInsecure();
-  client.setTimeout(20000);
-
-  HTTPClient http;
-  http.setTimeout(20000);
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
-  if (!http.begin(client, manifest.url)) {
-    error = "Firmware connection failed";
-    return false;
-  }
-
+  if (manifest.size > maxSketchSpace) { error = "Firmware too large"; return false; }
+  otaJobState = "downloading"; otaJobMessage = "Downloading firmware";
+  addLog("OTA: firmware download started (" + String(manifest.size) + " bytes)");
+  saveOtaRecord(1, manifest.version);
+  BearSSL::WiFiClientSecure client; client.setInsecure(); client.setTimeout(20000);
+  HTTPClient http; http.setTimeout(20000); http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  if (!http.begin(client, manifest.url)) { error = "Firmware connection failed"; saveOtaRecord(5, manifest.version, error); return false; }
   int code = http.GET();
-  if (code != HTTP_CODE_OK) {
-    error = "Firmware HTTP " + String(code);
-    http.end();
-    return false;
-  }
-
+  if (code != HTTP_CODE_OK) { error = "Firmware HTTP " + String(code); http.end(); saveOtaRecord(5, manifest.version, error); return false; }
   int contentLength = http.getSize();
-  if (contentLength > 0 && (size_t)contentLength != manifest.size) {
-    error = "Firmware size mismatch";
-    http.end();
-    return false;
-  }
-
-  if (!Update.begin(manifest.size)) {
-    error = "Update begin failed";
-    http.end();
-    return false;
-  }
-
-  WiFiClient* stream = http.getStreamPtr();
-  Sha256Tiny sha;
-  uint8_t buffer[1024];
-  size_t total = 0;
-  uint32_t lastDataMs = millis();
-
+  if (contentLength > 0 && (size_t)contentLength != manifest.size) { error = "Firmware size mismatch"; http.end(); saveOtaRecord(5, manifest.version, error); return false; }
+  if (!Update.begin(manifest.size)) { error = "Update begin failed"; http.end(); saveOtaRecord(5, manifest.version, error); return false; }
+  WiFiClient* stream = http.getStreamPtr(); Sha256Tiny sha; uint8_t buffer[1024]; size_t total = 0; uint32_t lastDataMs = millis(); uint8_t nextLogPercent = 25;
   while (http.connected() && total < manifest.size) {
     size_t available = stream->available();
     if (available) {
-      size_t want = min(available, sizeof(buffer));
-      size_t got = stream->readBytes(buffer, want);
+      size_t want = min(available, sizeof(buffer)); size_t got = stream->readBytes(buffer, want);
       if (got) {
-        lastDataMs = millis();
-        sha.update(buffer, got);
-        if (Update.write(buffer, got) != got) {
-          error = "Firmware flash write failed";
-          http.end();
-          return false;
-        }
-        total += got;
+        lastDataMs = millis(); sha.update(buffer, got);
+        if (Update.write(buffer, got) != got) { error = "Firmware flash write failed"; scheduleRestart(1200); http.end(); saveOtaRecord(5, manifest.version, error); return false; }
+        total += got; uint8_t pct = (uint8_t)((total * 100UL) / manifest.size);
+        if (pct >= nextLogPercent && nextLogPercent <= 100) { addLog("OTA: download " + String(nextLogPercent) + "%"); nextLogPercent += 25; }
       }
     } else {
-      if ((uint32_t)(millis() - lastDataMs) > 20000UL) {
-        error = "Firmware download timeout";
-        http.end();
-        return false;
-      }
-      delay(1);
-      yield();
+      if ((uint32_t)(millis() - lastDataMs) > 20000UL) { error = "Firmware download timeout"; scheduleRestart(1200); http.end(); saveOtaRecord(5, manifest.version, error); return false; }
+      delay(1); yield();
     }
   }
-
   http.end();
-
-  if (total != manifest.size) {
-    error = "Firmware incomplete";
-    return false;
-  }
-
+  if (total != manifest.size) { error = "Firmware incomplete"; scheduleRestart(1200); saveOtaRecord(5, manifest.version, error); return false; }
+  addLog("OTA: firmware download complete"); saveOtaRecord(2, manifest.version);
+  otaJobState = "verifying"; otaJobMessage = "Verifying SHA-256"; addLog("OTA: verifying SHA-256");
   String actualSha = sha.finalHex();
-  if (!actualSha.equalsIgnoreCase(manifest.sha256)) {
-    error = "Firmware SHA-256 mismatch";
-    return false;
-  }
-
-  if (!Update.end(true)) {
-    error = "Firmware finalize failed";
-    return false;
-  }
-  return true;
+  if (!actualSha.equalsIgnoreCase(manifest.sha256)) { error = "Firmware SHA-256 mismatch"; scheduleRestart(1200); addLog("OTA: SHA-256 verification failed"); saveOtaRecord(5, manifest.version, error); return false; }
+  addLog("OTA: SHA-256 verified"); saveOtaRecord(3, manifest.version);
+  otaJobState = "installing"; otaJobMessage = "Finalizing firmware"; addLog("OTA: finalizing firmware installation");
+  if (!Update.end(true)) { error = "Firmware finalize failed"; saveOtaRecord(5, manifest.version, error); return false; }
+  addLog("OTA: firmware installation successful"); saveOtaRecord(4, manifest.version); return true;
 }
 
 static void apiOtaCheck() {
-  OtaManifest manifest;
-  String error;
-  if (!fetchOtaManifest(manifest, error)) {
-    sendError(502, error);
-    return;
-  }
-
-  JsonDocument doc;
-  doc["current_version"] = APP_VERSION;
-  doc["available_version"] = manifest.version;
-  doc["update_available"] = isNewerVersion(manifest.version, APP_VERSION);
-  doc["size"] = manifest.size;
-  sendJson(doc);
+  OtaManifest manifest; String error;
+  if (!fetchOtaManifest(manifest, error)) { addLog("OTA: update check failed: " + error); cachedOtaManifestValid = false; sendError(502, error); return; }
+  cachedOtaManifest = manifest; cachedOtaManifestValid = true;
+  bool available = isNewerVersion(manifest.version, APP_VERSION);
+  addLog(available ? ("OTA: update available " + manifest.version) : "OTA: firmware is up to date");
+  JsonDocument doc; doc["current_version"] = APP_VERSION; doc["available_version"] = manifest.version; doc["update_available"] = available; doc["size"] = manifest.size; sendJson(doc);
 }
 
 static void apiOtaUpdate() {
-  OtaManifest manifest;
-  String error;
-  if (!fetchOtaManifest(manifest, error)) {
-    sendError(502, error);
-    return;
-  }
+  if (otaUpdateRequested || otaJobState == "downloading" || otaJobState == "verifying" || otaJobState == "installing") { sendError(409, "OTA update already running"); return; }
+  if (!cachedOtaManifestValid || !isNewerVersion(cachedOtaManifest.version, APP_VERSION)) { sendError(409, "Run update check first"); return; }
+  otaJobTargetVersion = cachedOtaManifest.version; otaJobState = "scheduled"; otaJobMessage = "Update scheduled";
+  otaUpdateRequested = true; otaUpdateRunAt = millis() + 750;
+  addLog("OTA: update scheduled for " + otaJobTargetVersion);
+  JsonDocument doc; doc["ok"] = true; doc["started"] = true; doc["target_version"] = otaJobTargetVersion; sendJson(doc);
+}
 
-  if (!isNewerVersion(manifest.version, APP_VERSION)) {
-    JsonDocument doc;
-    doc["ok"] = true;
-    doc["updated"] = false;
-    doc["message"] = "No newer version available";
-    sendJson(doc);
-    return;
-  }
+static void apiOtaStatus() {
+  JsonDocument doc; doc["state"] = otaJobState; doc["message"] = otaJobMessage; doc["target_version"] = otaJobTargetVersion;
+  doc["running"] = otaUpdateRequested || otaJobState == "downloading" || otaJobState == "verifying" || otaJobState == "installing"; sendJson(doc);
+}
 
-  addLog("OTA update started: " + manifest.version);
-  if (!downloadAndFlashOta(manifest, error)) {
-    addLog("OTA update failed: " + error);
-    sendError(502, error);
-    return;
-  }
-
-  addLog("OTA update installed: " + manifest.version);
-  JsonDocument doc;
-  doc["ok"] = true;
-  doc["updated"] = true;
-  doc["version"] = manifest.version;
-  sendJson(doc);
-  scheduleRestart(1200);
+static void otaLoop() {
+  if (!otaUpdateRequested || (int32_t)(millis() - otaUpdateRunAt) < 0) return;
+  otaUpdateRequested = false; OtaManifest manifest = cachedOtaManifest; cachedOtaManifestValid = false; String error;
+  addLog("OTA: update process started");
+  if (!downloadAndFlashOta(manifest, error)) { otaJobState = "failed"; otaJobMessage = error; addLog("OTA: update failed: " + error); return; }
+  otaJobState = "rebooting"; otaJobMessage = "Update installed, rebooting"; addLog("OTA: reboot scheduled"); scheduleRestart(1500);
 }
 
 static void sendJson(JsonDocument& doc, int status) {
@@ -799,6 +794,7 @@ static void setupRoutes() {
   server.on("/api/calibration/wet", HTTP_POST, [](){ calibratePoint(false); });
   server.on("/api/ota/check", HTTP_GET, apiOtaCheck);
   server.on("/api/ota/update", HTTP_POST, apiOtaUpdate);
+  server.on("/api/ota/status", HTTP_GET, apiOtaStatus);
   server.on("/api/ota/config", HTTP_GET, [](){
     JsonDocument doc;
     doc["manifest_url"] = OTA_MANIFEST_URL;
@@ -853,6 +849,7 @@ void setup() {
   }
 
   configureTime();
+  reportPreviousOta();
   setupRoutes();
   server.begin();
   addLog("HTTP server started");
@@ -862,6 +859,7 @@ void loop() {
   server.handleClient();
   wifiLoop();
   sensorLoop();
+  otaLoop();
 
   if (restartPending && (int32_t)(millis() - restartAt) >= 0) {
     delay(50);

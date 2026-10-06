@@ -148,7 +148,10 @@ pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:
   <div class="card">
     <div class="row"><span data-i18n="installed">Installiert</span><b id="otaCurrent">--</b></div>
     <div class="row"><span data-i18n="available">Verfügbar</span><b id="otaAvailable">--</b></div>
-    <div class="actions"><button class="action" onclick="checkOta()" data-i18n="checkUpdate">Update prüfen</button></div>
+    <div class="actions">
+      <button id="otaCheckBtn" class="action secondary" onclick="checkOta()" data-i18n="checkUpdate">Update prüfen</button>
+      <button id="otaInstallBtn" class="action" onclick="installOta()" style="display:none" data-i18n="installUpdate">Update installieren</button>
+    </div>
     <div class="progress"><span id="otaProgress"></span></div>
     <div class="hint" id="otaMsg"></div>
   </div>
@@ -184,7 +187,7 @@ de:{
  systemSub:'WLAN, Gerätename, NTP und Oberfläche konfigurieren.',deviceName:'Gerätename',wifiPassword:'Wi-Fi Passwort',
  passwordHint:'Leer lassen, um das gespeicherte Passwort beizubehalten.',timezone:'Zeitzone (POSIX TZ)',language:'Sprache',
  reboot:'Neustart',refresh:'Aktualisieren',otaSub:'Firmware aktualisieren.',installed:'Installiert',available:'Verfügbar',
- checkUpdate:'Update prüfen',manualUpdate:'Manuelles Firmware-Update',uploadFirmware:'Firmware hochladen',
+ checkUpdate:'Update prüfen',installUpdate:'Update installieren',manualUpdate:'Manuelles Firmware-Update',uploadFirmware:'Firmware hochladen',
  resetText:'Alle gespeicherten Einstellungen einschließlich WLAN und Sensorkalibrierung werden gelöscht.',
  resetButton:'Werkseinstellungen laden',connected:'Verbunden',apMode:'AP-Modus',offline:'Nicht erreichbar',
  calibrated:'Kalibriert',notCalibrated:'Nicht kalibriert',active:'Aktiv',waiting:'Warte auf Messung',synchronized:'Synchronisiert',waitingNtp:'Wartet'
@@ -202,7 +205,7 @@ en:{
  systemSub:'Configure Wi-Fi, device name, NTP and user interface.',deviceName:'Device name',wifiPassword:'Wi-Fi password',
  passwordHint:'Leave empty to keep the stored password.',timezone:'Timezone (POSIX TZ)',language:'Language',
  reboot:'Reboot',refresh:'Refresh',otaSub:'Update firmware.',installed:'Installed',available:'Available',
- checkUpdate:'Check for update',manualUpdate:'Manual firmware update',uploadFirmware:'Upload firmware',
+ checkUpdate:'Check for update',installUpdate:'Install update',manualUpdate:'Manual firmware update',uploadFirmware:'Upload firmware',
  resetText:'All saved settings including Wi-Fi and sensor calibration will be erased.',
  resetButton:'Restore factory settings',connected:'Connected',apMode:'AP mode',offline:'Offline',
  calibrated:'Calibrated',notCalibrated:'Not calibrated',active:'Active',waiting:'Waiting for measurement',synchronized:'Synchronized',waitingNtp:'Waiting'
@@ -287,31 +290,32 @@ async function calibrate(which){try{await postForm('/api/calibration/'+which,{})
 async function loadLog(){try{let r=await fetch('/api/log');logText.textContent=await r.text()}catch(e){logText.textContent=e.message}}
 async function reboot(){if(confirm('Reboot?')){await postForm('/api/reboot',{})}}
 async function factoryReset(){if(confirm(lang==='de'?'Wirklich alle Einstellungen löschen?':'Really erase all settings?')){await postForm('/api/factory-reset',{})}}
+let otaExpectedVersion='';
+let otaWatchTimer=null;
 async function checkOta(){
  try{
-  otaMsg.textContent=lang==='de'?'Prüfe Update…':'Checking update…';
-  otaProgress.style.width='0';
-  let c=await api('/api/ota/check');
-  otaAvailable.textContent='v'+String(c.available_version||'').replace(/^v/,'');
-  if(!c.update_available){
-    otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';
-    return;
-  }
-  if(!confirm((lang==='de'?'Version ':'Version ')+c.available_version+(lang==='de'?' installieren?':' install?')))return;
-  otaMsg.textContent=lang==='de'?'Firmware wird vom ESP heruntergeladen und installiert…':'ESP is downloading and installing firmware…';
-  otaProgress.style.width='35%';
-  let r=await api('/api/ota/update',{method:'POST'});
-  if(r.updated){
-    otaProgress.style.width='100%';
-    otaMsg.textContent=lang==='de'?'Update installiert – Neustart…':'Update installed – rebooting…';
-  }else{
-    otaProgress.style.width='0';
-    otaMsg.textContent=r.message||'No update';
-  }
- }catch(e){
-  otaProgress.style.width='0';
-  otaMsg.textContent=e.message;
- }
+  otaCheckBtn.disabled=true; otaInstallBtn.style.display='none'; otaMsg.textContent=lang==='de'?'Prüfe Update…':'Checking update…'; otaProgress.style.width='0';
+  let c=await api('/api/ota/check'); otaAvailable.textContent='v'+String(c.available_version||'').replace(/^v/,''); otaExpectedVersion=String(c.available_version||'').replace(/^v/,'');
+  if(c.update_available){ otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar.':'New firmware available.'; otaInstallBtn.style.display='inline-block'; }
+  else otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';
+ }catch(e){ otaMsg.textContent=e.message; } finally { otaCheckBtn.disabled=false; }
+}
+async function installOta(){
+ try{
+  otaInstallBtn.disabled=true; otaCheckBtn.disabled=true; otaMsg.textContent=lang==='de'?'Update wird gestartet…':'Starting update…'; otaProgress.style.width='15%';
+  let r=await api('/api/ota/update',{method:'POST'}); otaExpectedVersion=String(r.target_version||otaExpectedVersion).replace(/^v/,'');
+  otaMsg.textContent=lang==='de'?'Firmware wird geladen und installiert. Gerät nicht ausschalten.':'Firmware is being downloaded and installed. Do not power off.'; otaProgress.style.width='45%'; watchOtaRestart();
+ }catch(e){ otaInstallBtn.disabled=false; otaCheckBtn.disabled=false; otaMsg.textContent=e.message; }
+}
+function watchOtaRestart(){
+ if(otaWatchTimer)clearInterval(otaWatchTimer); let misses=0;
+ otaWatchTimer=setInterval(async()=>{
+  try{
+   let st=await api('/api/state'); let current=String(st.version||'').replace(/^v/,''); misses=0;
+   if(otaExpectedVersion && current===otaExpectedVersion){ clearInterval(otaWatchTimer); otaWatchTimer=null; otaProgress.style.width='100%'; otaMsg.textContent=lang==='de'?'Update erfolgreich installiert.':'Update installed successfully.'; otaCurrent.textContent='v'+current; otaInstallBtn.style.display='none'; otaCheckBtn.disabled=false; return; }
+   try{ let os=await api('/api/ota/status'); if(os.state==='failed'){ clearInterval(otaWatchTimer); otaWatchTimer=null; otaProgress.style.width='0'; otaMsg.textContent=os.message||'OTA failed'; otaInstallBtn.disabled=false; otaCheckBtn.disabled=false; } else if(os.state==='rebooting'){ otaProgress.style.width='85%'; otaMsg.textContent=lang==='de'?'Firmware installiert – Neustart…':'Firmware installed – rebooting…'; } else if(os.running) otaProgress.style.width='55%'; }catch(_){}
+  }catch(_){ misses++; if(misses>2){ otaProgress.style.width='75%'; otaMsg.textContent=lang==='de'?'ESP startet neu…':'ESP is rebooting…'; } }
+ },2000);
 }
 async function manualUpload(){try{let f=fwFile.files[0];if(!f)throw Error('Select firmware.bin');await uploadBuf(await f.arrayBuffer())}catch(e){otaMsg.textContent=e.message}}
 document.querySelectorAll('#sensor input,#sensor select,#system input,#system select').forEach(el=>{
@@ -319,7 +323,7 @@ document.querySelectorAll('#sensor input,#sensor select,#system input,#system se
  el.addEventListener('change',()=>{formDirty=true});
 });
 loadState(true);
-setInterval(()=>{if(activePage==='status'&&!saveInProgress)loadState(false)},5000);
+setInterval(()=>{if(activePage==='status'&&!saveInProgress)loadState(false);if(activePage==='log')loadLog();},3000);
 </script>
 </body>
 </html>

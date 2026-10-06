@@ -1,28 +1,29 @@
-# ESP8266 Moisture Sensor v0.1.8
+# ESP8266 Moisture Sensor v0.1.10
 
-This release fixes the two-hour local-time offset observed during daylight-saving time.
+This release fixes an ESP8266 build error in the OTA failure handling.
 
-## Timezone fix
+## Build fix
 
-The previous implementation configured NTP with the integer-offset `configTime()` overload after setting the POSIX timezone separately. On ESP8266 this could result in UTC being shown even though the stored timezone was correct.
+The previous OTA implementation used:
 
-The firmware now uses the ESP8266 POSIX timezone overload directly:
+`Update.abort()`
 
-`configTime(cfg.timezone, cfg.ntpServer)`
+`UpdaterClass` in the ESP8266 Arduino core does not provide an `abort()` method, which caused compilation to fail.
 
-The configured timezone is still applied to the C runtime with `TZ` / `tzset()` and timestamps are formatted using `localtime_r()`.
+The unsupported calls have been removed.
 
-Default timezone:
+If an OTA download, flash write, timeout or SHA-256 verification fails, the firmware now records the error and schedules a restart without calling `Update.end()`. This discards the unfinished OTA session while keeping the currently installed firmware active.
 
-`CET-1CEST,M3.5.0,M10.5.0/3`
+## OTA behavior retained
 
-This automatically provides:
-
-- CET / UTC+1 in winter
-- CEST / UTC+2 in summer
-
-Saving System settings immediately reapplies NTP and the timezone; a reboot is not required.
+- update availability check
+- conditional `Update installieren` button
+- no confirmation alert
+- OTA process logging
+- SHA-256 verification
+- automatic reboot/reconnect handling
+- persistent OTA result reporting
 
 ## Version
 
-v0.1.8
+v0.1.10

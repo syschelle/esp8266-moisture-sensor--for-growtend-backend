@@ -144,7 +144,7 @@ static void defaults() {
   cfg.magic = CFG_MAGIC;
   cfg.schema = CFG_SCHEMA;
   copyText(cfg.deviceName, sizeof(cfg.deviceName), "SoilSensor-1");
-  copyText(cfg.sensorName, sizeof(cfg.sensorName), "Topf 1");
+  copyText(cfg.sensorName, sizeof(cfg.sensorName), "SoilSensor-1"); // legacy compatibility field
   copyText(cfg.signalPin, sizeof(cfg.signalPin), "A0");
   cfg.dryAdc = 800;
   cfg.wetAdc = 400;
@@ -163,6 +163,12 @@ static bool loadConfig() {
   const bool ok = cfg.magic == CFG_MAGIC && cfg.schema == CFG_SCHEMA && cfg.crc == configCrc(cfg);
   if (!ok) {
     defaults();
+    EEPROM.put(0, cfg);
+    EEPROM.commit();
+  } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
+    // v0.1.15: deviceName is the single authoritative identity.
+    copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
+    cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
     EEPROM.commit();
   }
@@ -563,6 +569,71 @@ static bool downloadAndFlashOta(const OtaManifest& manifest, String& error) {
   addLog("OTA: firmware installation successful"); saveOtaRecord(4, manifest.version); return true;
 }
 
+
+static bool fetchOtaReadme(String& content, String& error) {
+  if (WiFi.status() != WL_CONNECTED) {
+    error = "Wi-Fi not connected";
+    return false;
+  }
+
+  addLog("OTA: loading release README");
+
+  BearSSL::WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(15000);
+
+  HTTPClient http;
+  http.setTimeout(15000);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+  if (!http.begin(client, OTA_README_URL)) {
+    error = "README connection failed";
+    return false;
+  }
+
+  const int code = http.GET();
+  if (code != HTTP_CODE_OK) {
+    error = "README HTTP " + String(code);
+    http.end();
+    return false;
+  }
+
+  const int contentLength = http.getSize();
+  if (contentLength > 16384) {
+    error = "README too large";
+    http.end();
+    return false;
+  }
+
+  content = http.getString();
+  http.end();
+
+  if (!content.length()) {
+    error = "README empty";
+    return false;
+  }
+
+  addLog("OTA: release README loaded");
+  return true;
+}
+
+static void apiOtaReadme() {
+  if (!cachedOtaManifestValid || !isNewerVersion(cachedOtaManifest.version, APP_VERSION)) {
+    sendError(409, "No newer firmware selected");
+    return;
+  }
+
+  String content;
+  String error;
+  if (!fetchOtaReadme(content, error)) {
+    addLog("OTA: README load failed: " + error);
+    sendError(502, error);
+    return;
+  }
+
+  server.send(200, "text/plain; charset=utf-8", content);
+}
+
 static void apiOtaCheck() {
   OtaManifest manifest; String error;
   if (!fetchOtaManifest(manifest, error)) { addLog("OTA: update check failed: " + error); cachedOtaManifestValid = false; sendError(502, error); return; }
@@ -606,14 +677,24 @@ static void sendError(int status, const String& msg) {
   sendJson(doc, status);
 }
 
-static bool validName(const String& v) {
-  return v.length() >= 1 && v.length() <= 32;
+static bool validDeviceName(const String& v) {
+  if (v.length() < 1 || v.length() > 32) return false;
+  if (v[0] == '-' || v[v.length() - 1] == '-') return false;
+  for (size_t i = 0; i < v.length(); ++i) {
+    const char c = v[i];
+    const bool allowed = (c >= 'A' && c <= 'Z') ||
+                         (c >= 'a' && c <= 'z') ||
+                         (c >= '0' && c <= '9') ||
+                         c == '-';
+    if (!allowed) return false;
+  }
+  return true;
 }
 
 static void apiCurrentValues() {
   JsonDocument doc;
   doc["device"] = cfg.deviceName;
-  doc["sensor"] = cfg.sensorName;
+  doc["sensor"] = cfg.deviceName;
   doc["signal_pin"] = cfg.signalPin;
   doc["firmware_version"] = APP_VERSION;
   doc["raw_adc"] = sensorState.valid ? sensorState.rawAdc : -1;
@@ -647,7 +728,7 @@ static void apiState() {
 
   JsonObject settings = doc["settings"].to<JsonObject>();
   settings["device_name"] = cfg.deviceName;
-  settings["sensor_name"] = cfg.sensorName;
+  settings["sensor_name"] = cfg.deviceName; // compatibility alias
   settings["signal_pin"] = cfg.signalPin;
   settings["measure_interval_seconds"] = cfg.measureIntervalSeconds;
   settings["sample_count"] = cfg.sampleCount;
@@ -683,17 +764,14 @@ static void apiState() {
 }
 
 static void saveSensorSettings() {
-  const String name = server.arg("sensor_name");
   const String pin = server.arg("signal_pin");
   const int interval = server.arg("interval").toInt();
   const int samples = server.arg("samples").toInt();
 
-  if (!validName(name)) return sendError(400, "Invalid sensor name");
   if (pin != "A0") return sendError(400, "ESP8266 supports only A0 as analog signal pin");
   if (interval < 1 || interval > 300) return sendError(400, "Interval must be 1..300 seconds");
   if (samples < 1 || samples > 50) return sendError(400, "Sample count must be 1..50");
 
-  copyText(cfg.sensorName, sizeof(cfg.sensorName), name);
   copyText(cfg.signalPin, sizeof(cfg.signalPin), pin);
   cfg.measureIntervalSeconds = interval;
   cfg.sampleCount = samples;
@@ -713,14 +791,15 @@ static void saveSystemSettings() {
   const String language = server.arg("language");
   const String theme = server.arg("theme");
 
-  if (!validName(device)) return sendError(400, "Invalid device name");
+  if (!validDeviceName(device)) return sendError(400, "Device name: only A-Z, a-z, 0-9 and hyphen; no spaces or umlauts");
   if (ssid.length() > 32 || pass.length() > 64) return sendError(400, "Invalid Wi-Fi field length");
   if (ntp.length() < 1 || ntp.length() > 63 || tz.length() < 1 || tz.length() > 63) return sendError(400, "Invalid NTP/timezone");
   if (language != "de" && language != "en") return sendError(400, "Invalid language");
   if (theme != "light" && theme != "dark") return sendError(400, "Invalid theme");
 
-  const bool wifiChanged = ssid != cfg.ssid || pass.length() > 0;
+  const bool wifiChanged = ssid != cfg.ssid || pass.length() > 0 || device != cfg.deviceName;
   copyText(cfg.deviceName, sizeof(cfg.deviceName), device);
+  copyText(cfg.sensorName, sizeof(cfg.sensorName), device); // legacy field kept synchronized
   copyText(cfg.ssid, sizeof(cfg.ssid), ssid);
   if (pass.length() > 0) copyText(cfg.wifiPassword, sizeof(cfg.wifiPassword), pass);
   copyText(cfg.ntpServer, sizeof(cfg.ntpServer), ntp);
@@ -793,6 +872,7 @@ static void setupRoutes() {
   server.on("/api/ota/check", HTTP_GET, apiOtaCheck);
   server.on("/api/ota/update", HTTP_POST, apiOtaUpdate);
   server.on("/api/ota/status", HTTP_GET, apiOtaStatus);
+  server.on("/api/ota/readme", HTTP_GET, apiOtaReadme);
   server.on("/api/ota/config", HTTP_GET, [](){
     JsonDocument doc;
     doc["manifest_url"] = OTA_MANIFEST_URL;

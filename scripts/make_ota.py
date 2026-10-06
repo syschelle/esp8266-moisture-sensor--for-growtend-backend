@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, json, shutil, sys
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.14"
+VERSION = "0.1.15"
 REPO = "syschelle/esp8266-moisture-sensor--for-growtend-backend"
 BIN = ROOT / ".pio" / "build" / "d1_mini" / "firmware.bin"
 OUT = ROOT / "ota-dist"
@@ -24,9 +24,7 @@ manifest = {
     "sha256": sha
 }
 (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-(OUT / "README.md").write_text(
-    f"# OTA channel\n\nFirmware: v{VERSION}\n\nGenerated from the main source tree.\n",
-    encoding="utf-8"
-)
+release_notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+(OUT / "README.md").write_text(release_notes, encoding="utf-8")
 print(f"OTA files created in {OUT}")
 print(f"SHA-256: {sha}")

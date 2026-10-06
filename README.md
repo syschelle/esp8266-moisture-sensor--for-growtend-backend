@@ -2,7 +2,7 @@
 
 This ESP8266-based sensor reads one capacitive analog soil-moisture sensor and exposes the current moisture value via HTTP for direct integration with the `syschelle/growtent-backend` project.
 
-**Current version: v0.1.14**
+**Current version: v0.1.15**
 
 ## Scope
 
@@ -35,7 +35,7 @@ Verify the accepted ADC input voltage for the exact ESP8266 board before connect
 
 The signal pin is configurable in the web interface.
 
-On ESP8266 v0.1.14 the supported analog input is:
+On ESP8266 v0.1.15 the supported analog input is:
 
 `A0`
 
@@ -102,7 +102,7 @@ Example:
   "device": "SoilSensor-1",
   "sensor": "Topf 1",
   "signal_pin": "A0",
-  "firmware_version": "0.1.14",
+  "firmware_version": "0.1.15",
   "raw_adc": 487,
   "moisture_percent": 63.4,
   "calibrated": true,
@@ -116,7 +116,23 @@ Example:
 
 `GET /api/health`
 
+## Device name and hostname
+
+The firmware uses one device name for both the sensor identity and the network hostname.
+
+Allowed characters:
+
+- `A-Z`
+- `a-z`
+- `0-9`
+- `-`
+
+Spaces and umlauts are not accepted. The name cannot start or end with a hyphen.
+
+The same value is shown in the web interface and browser tab and is returned through the API.
+
 ## Wi-Fi fallback AP
+
 
 If no normal Wi-Fi connection can be established, the device starts its setup access point.
 
@@ -188,7 +204,14 @@ Pushing a version tag triggers a firmware build. The GitHub Release receives:
 - `manifest.json`
 - `README.md`
 
+## OTA release changes
+
+When a newer firmware is available, the OTA page shows the release changes in a separate card below the manual firmware-update card.
+
+The release `README.md` asset is generated from `RELEASE_NOTES.md` and is retrieved by the ESP8266 through `/api/ota/readme`.
+
 ## OTA user experience
+
 
 The OTA page first checks for a newer release. The **Install update** button is only shown when a newer firmware version is available. Starting an update is acknowledged immediately by the ESP; the browser then waits for the device to reboot and verifies the installed version. Temporary connection loss during flashing/reboot is expected and is not shown as `Failed to fetch`.
 

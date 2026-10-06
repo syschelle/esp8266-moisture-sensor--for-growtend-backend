@@ -41,6 +41,7 @@ input:focus,select:focus{outline:2px solid rgba(47,101,217,.18);border-color:var
 button.action{border:0;border-radius:7px;padding:10px 14px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer}
 button.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}button.danger{background:var(--bad)}
 .hint{color:var(--muted);font-size:12px;margin-top:7px}.saveState{font-size:12px;margin-top:10px;color:var(--muted)}
+.releaseReadme{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;color:var(--text);font-size:14px}
 pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:7px;overflow:auto;max-height:520px;white-space:pre-wrap}
 .progress{height:9px;background:var(--line);border-radius:999px;overflow:hidden;margin-top:15px}.progress span{display:block;height:100%;width:0;background:var(--primary)}
 @media(max-width:850px){.sidebar{width:175px}.content{margin-left:175px;padding:75px 18px 26px}.grid2{grid-template-columns:1fr}}
@@ -100,7 +101,6 @@ pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:
   <div class="grid2">
     <div class="card">
       <h2 data-i18n="sensorSettings">Sensoreinstellungen</h2>
-      <label data-i18n="sensorName">Sensorname</label><input id="sensorName" maxlength="32">
       <label data-i18n="signalPin">Signalpin</label>
       <select id="signalPin"><option value="A0">A0 (ADC)</option></select>
       <div class="hint" data-i18n="pinHint">Beim ESP8266 ist A0 der analoge Sensoreingang.</div>
@@ -126,7 +126,8 @@ pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:
 <section class="page" id="system">
   <div class="headrow"><div><h1 data-i18n="systemSettings">Systemeinstellungen</h1><div class="subtitle" data-i18n="systemSub">WLAN, Gerätename, NTP und Oberfläche konfigurieren.</div></div></div>
   <div class="card">
-    <label data-i18n="deviceName">Gerätename</label><input id="deviceName" maxlength="32">
+    <label data-i18n="deviceName">Gerätename</label><input id="deviceName" maxlength="32" pattern="[A-Za-z0-9](?:[A-Za-z0-9-]{0,30}[A-Za-z0-9])?" autocomplete="off">
+    <div class="hint" data-i18n="deviceNameHint">Wird auch als Netzwerk-Hostname verwendet. Nur A-Z, a-z, 0-9 und Bindestrich; keine Leerzeichen oder Umlaute.</div>
     <label>Wi-Fi SSID</label><input id="ssid" maxlength="32">
     <label data-i18n="wifiPassword">Wi-Fi Passwort</label><input id="wifiPass" type="password" maxlength="64" placeholder="********">
     <div class="hint" data-i18n="passwordHint">Leer lassen, um das gespeicherte Passwort beizubehalten.</div>
@@ -160,6 +161,10 @@ pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:
     <input id="fwFile" type="file" accept=".bin,application/octet-stream">
     <div class="actions"><button class="action" onclick="manualUpload()" data-i18n="uploadFirmware">Firmware hochladen</button></div>
   </div>
+  <div id="otaReadmeCard" class="card" style="margin-top:14px;display:none">
+    <h2 data-i18n="updateChanges">Änderungen der verfügbaren Firmware</h2>
+    <div id="otaReadme" class="releaseReadme">--</div>
+  </div>
 </section>
 
 <section class="page" id="reset">
@@ -184,10 +189,10 @@ de:{
  measureInterval:'Messintervall (Sekunden)',sampleCount:'Messungen pro Mittelwert',save:'Speichern',
  calibration:'Kalibrierung',moisture:'Bodenfeuchte',takeDry:'Aktuellen Wert als TROCKEN speichern',
  takeWet:'Aktuellen Wert als NASS speichern',calHint:'Trocken und nass müssen ausreichend unterschiedliche ADC-Werte liefern.',
- systemSub:'WLAN, Gerätename, NTP und Oberfläche konfigurieren.',deviceName:'Gerätename',wifiPassword:'Wi-Fi Passwort',
+ systemSub:'WLAN, Gerätename, NTP und Oberfläche konfigurieren.',deviceName:'Gerätename',deviceNameHint:'Wird auch als Netzwerk-Hostname verwendet. Nur A-Z, a-z, 0-9 und Bindestrich; keine Leerzeichen oder Umlaute.',wifiPassword:'Wi-Fi Passwort',
  passwordHint:'Leer lassen, um das gespeicherte Passwort beizubehalten.',timezone:'Zeitzone (POSIX TZ)',language:'Sprache',
  reboot:'Neustart',refresh:'Aktualisieren',otaSub:'Firmware aktualisieren.',installed:'Installiert',available:'Verfügbar',
- checkUpdate:'Update prüfen',installUpdate:'Update installieren',manualUpdate:'Manuelles Firmware-Update',uploadFirmware:'Firmware hochladen',
+ checkUpdate:'Update prüfen',installUpdate:'Update installieren',updateChanges:'Änderungen der verfügbaren Firmware',manualUpdate:'Manuelles Firmware-Update',uploadFirmware:'Firmware hochladen',
  resetText:'Alle gespeicherten Einstellungen einschließlich WLAN und Sensorkalibrierung werden gelöscht.',
  resetButton:'Werkseinstellungen laden',connected:'Verbunden',apMode:'AP-Modus',offline:'Nicht erreichbar',
  calibrated:'Kalibriert',notCalibrated:'Nicht kalibriert',active:'Aktiv',waiting:'Warte auf Messung',synchronized:'Synchronisiert',waitingNtp:'Wartet'
@@ -202,10 +207,10 @@ en:{
  measureInterval:'Measurement interval (seconds)',sampleCount:'Samples per average',save:'Save',
  calibration:'Calibration',moisture:'Soil moisture',takeDry:'Store current value as DRY',
  takeWet:'Store current value as WET',calHint:'Dry and wet must provide sufficiently different ADC values.',
- systemSub:'Configure Wi-Fi, device name, NTP and user interface.',deviceName:'Device name',wifiPassword:'Wi-Fi password',
+ systemSub:'Configure Wi-Fi, device name, NTP and user interface.',deviceName:'Device name',deviceNameHint:'Also used as the network hostname. Use only A-Z, a-z, 0-9 and hyphen; no spaces or umlauts.',wifiPassword:'Wi-Fi password',
  passwordHint:'Leave empty to keep the stored password.',timezone:'Timezone (POSIX TZ)',language:'Language',
  reboot:'Reboot',refresh:'Refresh',otaSub:'Update firmware.',installed:'Installed',available:'Available',
- checkUpdate:'Check for update',installUpdate:'Install update',manualUpdate:'Manual firmware update',uploadFirmware:'Upload firmware',
+ checkUpdate:'Check for update',installUpdate:'Install update',updateChanges:'Changes in available firmware',manualUpdate:'Manual firmware update',uploadFirmware:'Upload firmware',
  resetText:'All saved settings including Wi-Fi and sensor calibration will be erased.',
  resetButton:'Restore factory settings',connected:'Connected',apMode:'AP mode',offline:'Offline',
  calibrated:'Calibrated',notCalibrated:'Not calibrated',active:'Active',waiting:'Waiting for measurement',synchronized:'Synchronized',waitingNtp:'Waiting'
@@ -229,14 +234,14 @@ async function loadState(forceFormFill=false){
  try{
    S=await api('/api/state');lang=S.settings.language||'de';applyI18n();setTheme(S.settings.theme||'light');
    topBrand.textContent=S.settings.device_name||'ESP8266 Moisture Sensor';
-   document.title=S.settings.sensor_name||S.settings.device_name||'ESP8266 Moisture Sensor';
+   document.title=S.settings.device_name||'ESP8266 Moisture Sensor';
 
    let connected=!!S.wifi.connected, ap=!!S.wifi.ap_active;
    if(connected)badge(connBadge,tr('connected'),'good');else if(ap)badge(connBadge,tr('apMode'),'warn');else badge(connBadge,tr('offline'),'bad');
    badge(sysBadge,connected?tr('connected'):(ap?tr('apMode'):tr('offline')),connected?'good':(ap?'warn':'bad'));
 
    heroMoisture.textContent=S.sensor.valid?pct(S.sensor.moisture_percent):'-- %';
-   heroSensor.textContent=S.settings.sensor_name||'--';
+   heroSensor.textContent=S.settings.device_name||'--';
    heroCal.textContent=S.sensor.calibrated?tr('calibrated'):tr('notCalibrated');
    badge(sensorBadge,S.sensor.valid?tr('active'):tr('waiting'),S.sensor.valid?'good':'warn');
 
@@ -259,7 +264,7 @@ async function loadState(forceFormFill=false){
    calMoist.textContent=S.sensor.valid?pct(S.sensor.moisture_percent):'--';
 
    if(forceFormFill || (!formDirty && !saveInProgress)){
-     sensorName.value=S.settings.sensor_name||'';signalPin.value=S.settings.signal_pin||'A0';
+     signalPin.value=S.settings.signal_pin||'A0';
      interval.value=S.settings.measure_interval_seconds;samples.value=S.settings.sample_count;
      deviceName.value=S.settings.device_name||'';ssid.value=S.settings.ssid||'';
      ntpServer.value=S.settings.ntp_server||'';timezone.value=S.settings.timezone||'';
@@ -271,7 +276,7 @@ async function loadState(forceFormFill=false){
 async function saveSensor(){
  try{
   saveInProgress=true;sensorSaveState.textContent=lang==='de'?'Speichere…':'Saving…';
-  await postForm('/api/settings/sensor',{sensor_name:sensorName.value,signal_pin:signalPin.value,interval:interval.value,samples:samples.value});
+  await postForm('/api/settings/sensor',{signal_pin:signalPin.value,interval:interval.value,samples:samples.value});
   formDirty=false;sensorSaveState.textContent=lang==='de'?'Gespeichert.':'Saved.';
   await loadState(true);
  }catch(e){sensorSaveState.textContent=e.message;alert(e.message)}
@@ -279,6 +284,10 @@ async function saveSensor(){
 }
 async function saveSystem(){
  try{
+  const devicePattern=/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,30}[A-Za-z0-9])?$/;
+  if(!devicePattern.test(deviceName.value)){
+   throw Error(lang==='de'?'Gerätename: nur A-Z, a-z, 0-9 und Bindestrich; keine Leerzeichen oder Umlaute.':'Device name: only A-Z, a-z, 0-9 and hyphen; no spaces or umlauts.');
+  }
   saveInProgress=true;systemSaveState.textContent=lang==='de'?'Speichere…':'Saving…';
   let result=await postForm('/api/settings/system',{device_name:deviceName.value,ssid:ssid.value,wifi_password:wifiPass.value,ntp_server:ntpServer.value,timezone:timezone.value,language:language.value,theme:theme.value});
   formDirty=false;wifiPass.value='';
@@ -293,12 +302,25 @@ async function reboot(){if(confirm('Reboot?')){await postForm('/api/reboot',{})}
 async function factoryReset(){if(confirm(lang==='de'?'Wirklich alle Einstellungen löschen?':'Really erase all settings?')){await postForm('/api/factory-reset',{})}}
 let otaExpectedVersion='';
 let otaWatchTimer=null;
+async function loadOtaReadme(){
+ try{
+  let r=await fetch('/api/ota/readme',{cache:'no-store'}),text=await r.text();
+  if(!r.ok)throw Error(text||('HTTP '+r.status));
+  otaReadme.textContent=text;otaReadmeCard.style.display='block';
+ }catch(e){
+  otaReadme.textContent=lang==='de'?'Änderungen konnten nicht geladen werden: '+e.message:'Could not load changes: '+e.message;
+  otaReadmeCard.style.display='block';
+ }
+}
 async function checkOta(){
  try{
-  otaCheckBtn.disabled=true; otaInstallBtn.style.display='none'; otaMsg.textContent=lang==='de'?'Prüfe Update…':'Checking update…'; otaProgress.style.width='0';
+  otaCheckBtn.disabled=true; otaInstallBtn.style.display='none'; otaReadmeCard.style.display='none'; otaReadme.textContent='--'; otaMsg.textContent=lang==='de'?'Prüfe Update…':'Checking update…'; otaProgress.style.width='0';
   let c=await api('/api/ota/check'); otaAvailable.textContent='v'+String(c.available_version||'').replace(/^v/,''); otaExpectedVersion=String(c.available_version||'').replace(/^v/,'');
-  if(c.update_available){ otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar.':'New firmware available.'; otaInstallBtn.style.display='inline-block'; }
-  else otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';
+  if(c.update_available){
+   otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar.':'New firmware available.';
+   otaInstallBtn.style.display='inline-block';
+   await loadOtaReadme();
+  } else otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';
  }catch(e){ otaMsg.textContent=e.message; } finally { otaCheckBtn.disabled=false; }
 }
 async function installOta(){

@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.14", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.14", "0.1.14"))
+check("version newer patch", is_newer("0.1.15", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.15", "0.1.15"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -85,8 +85,18 @@ check("System log live refresh", "if(activePage==='log')loadLog()" in UI)
 check("fixed header content clearance", ".content{margin-left:205px;padding:87px 32px 40px" in UI)
 check("tablet header content clearance", ".content{margin-left:175px;padding:75px 18px 26px" in UI)
 
-check("browser tab uses sensor name", "document.title=S.settings.sensor_name||S.settings.device_name||'ESP8266 Moisture Sensor'" in UI)
+check("browser tab uses device name", "document.title=S.settings.device_name||\'ESP8266 Moisture Sensor\'" in UI)
 check("browser title fallback present", "<title>SoilSensor</title>" in UI)
+
+check("single authoritative device name", 'doc["sensor"] = cfg.deviceName;' in MAIN and 'settings["sensor_name"] = cfg.deviceName;' in MAIN)
+check("legacy sensor name synchronized", "copyText(cfg.sensorName, sizeof(cfg.sensorName), device)" in MAIN)
+check("hostname-safe server validation", "validDeviceName" in MAIN and "no spaces or umlauts" in MAIN)
+check("sensor name input removed", 'id="sensorName"' not in UI)
+check("hostname-safe client validation", "const devicePattern=/^[A-Za-z0-9]" in UI)
+check("OTA README endpoint", '"/api/ota/readme"' in MAIN)
+check("OTA README card", 'id="otaReadmeCard"' in UI)
+check("OTA README loaded only for update", "await loadOtaReadme()" in UI)
+check("OTA README asset contains release notes", 'release_notes = (ROOT / "RELEASE_NOTES.md").read_text' in OTA_SCRIPT)
 
 # Release pipeline
 check("tag workflow", 'tags:' in WORKFLOW and '"v*"' in WORKFLOW)
@@ -98,7 +108,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.14", bool(m) and m.group(1) == "0.1.14")
+check("firmware version 0.1.15", bool(m) and m.group(1) == "0.1.15")
 
 if failures:
     print("\nInternal regression tests failed:")

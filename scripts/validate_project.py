@@ -14,8 +14,8 @@ ui = (root / "src" / "web_ui.h").read_text(encoding="utf-8")
 readme = (root / "README.md").read_text(encoding="utf-8")
 release = (root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
 
-require('#define APP_VERSION "0.1.14"' in version_h, "version header")
-require("v0.1.14" in readme and "v0.1.14" in release, "release version consistency")
+require('#define APP_VERSION "0.1.15"' in version_h, "version header")
+require("v0.1.15" in readme and "v0.1.15" in release, "release version consistency")
 require('"/api/current-values"' in main, "current-values API")
 require('"/api/health"' in main, "health API")
 require('pin != "A0"' in main, "A0 pin validation")
@@ -32,7 +32,7 @@ require("runs-on: ubuntu-24.04" in workflow, "fixed Ubuntu runner")
 require("pio run -e d1_mini" in workflow, "PlatformIO firmware build")
 require("python scripts/make_ota.py" in workflow, "OTA package creation")
 require("actions/upload-artifact@v4" in workflow, "firmware artifact upload")
-require("esp8266-moisture-sensor-v0.1.14" in workflow, "versioned firmware artifact name")
+require("esp8266-moisture-sensor-v0.1.15" in workflow, "versioned firmware artifact name")
 require("ota-dist/firmware.bin" in workflow, "firmware.bin artifact")
 require('tags:' in workflow and '"v*"' in workflow, "tag-triggered release workflow")
 require("permissions:" in workflow and "contents: write" in workflow, "release write permission")
@@ -111,8 +111,17 @@ require("min(available, sizeof(buffer))" not in main, "no mixed-type min in OTA 
 require(".content{margin-left:205px;padding:87px 32px 40px" in ui, "fixed header content clearance")
 require(".content{margin-left:175px;padding:75px 18px 26px" in ui, "tablet header content clearance")
 
-require("document.title=S.settings.sensor_name||S.settings.device_name||'ESP8266 Moisture Sensor'" in ui, "browser tab sensor name")
+require("document.title=S.settings.device_name||'ESP8266 Moisture Sensor'" in ui, "browser tab device name")
 require("<title>SoilSensor</title>" in ui, "browser title fallback")
+
+require('doc["sensor"] = cfg.deviceName;' in main, "API uses unified device name")
+require('settings["sensor_name"] = cfg.deviceName;' in main, "sensor compatibility alias unified")
+require("validDeviceName" in main, "hostname-safe device validation")
+require('id="sensorName"' not in ui, "sensor name UI removed")
+require('"/api/ota/readme"' in main, "OTA README endpoint")
+require('id="otaReadmeCard"' in ui, "OTA README card")
+require("await loadOtaReadme()" in ui, "OTA README load on update")
+require('release_notes = (ROOT / "RELEASE_NOTES.md").read_text' in ota_script, "OTA README from release notes")
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

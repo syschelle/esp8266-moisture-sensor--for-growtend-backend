@@ -1,40 +1,26 @@
-# ESP8266 Moisture Sensor v0.1.2
+# ESP8266 Moisture Sensor v0.1.3
 
-This release completes the GitHub firmware publishing workflow.
+This release fixes the remaining device naming inherited from the original project and makes the setup/AP identity consistent.
 
-## GitHub Release assets
+## Naming cleanup
 
-When a version tag is pushed, GitHub Actions now:
+- removes remaining legacy project-name references
+- keeps the fallback AP SSID as `MoistureSensor-<CHIPID>`
+- keeps the default device name as `SoilSensor-1`
+- keeps the fallback AP password as `MS-Setup-8266`
+- ensures the web UI, logs, documentation and firmware metadata consistently use the ESP8266 Moisture Sensor naming
 
-- builds the ESP8266 firmware with PlatformIO
-- creates the OTA package
-- keeps the normal GitHub Actions artifact
-- creates the matching GitHub Release when necessary
-- uploads the compiled firmware directly to the GitHub Release assets
+## README
 
-The GitHub Release now contains:
+The project description now explicitly states that the sensor is intended for direct integration with:
 
-- `firmware.bin`
-- `firmware.bin.sha256`
-- `manifest.json`
-- `README.md`
+`syschelle/growtent-backend`
 
-The standard GitHub-generated source archives remain available as well.
+## Validation
 
-## Build pipeline
+Project checks now fail if the legacy display-project name is reintroduced.
 
-The workflow continues to:
-
-- use `ubuntu-24.04`
-- run static project validation
-- build with `pio run -e d1_mini`
-- create the OTA package with `scripts/make_ota.py`
-- verify all generated files
-- upload `esp8266-moisture-sensor-v0.1.2` as a GitHub Actions artifact
-
-## Firmware functionality
-
-Sensor functionality is unchanged from v0.1.1:
+## Existing functionality retained
 
 - ESP8266 / Wemos D1 mini target
 - capacitive analog soil-moisture sensor on A0
@@ -49,8 +35,10 @@ Sensor functionality is unchanged from v0.1.1:
 - German/English web interface
 - light/dark theme
 - browser-assisted OTA
+- GitHub Actions firmware artifact
+- GitHub Release firmware assets
 - factory reset
 
 ## Version
 
-v0.1.2
+v0.1.3

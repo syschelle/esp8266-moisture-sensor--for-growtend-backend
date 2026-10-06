@@ -1,4 +1,4 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.2
+# Build / validation status — ESP8266 Moisture Sensor v0.1.3
 
 ## Completed in the artifact environment
 
@@ -8,6 +8,10 @@
 - `A0` signal-pin validation guard: PASS
 - calibration span guard: PASS
 - Wi-Fi fallback AP configuration presence: PASS
+- default AP SSID naming guard: PASS
+- default device name guard: PASS
+- default AP password guard: PASS
+- no legacy display-project naming guard: PASS
 - OTA repository / manifest configuration presence: PASS
 - canonical release-document policy: PASS
 - JavaScript syntax check: PASS
@@ -15,41 +19,16 @@
 - GitHub Release asset publishing workflow validation: PASS
 - ZIP packaging and SHA-256 generation: PASS
 
-## GitHub Actions workflow
+## Runtime identity
 
-For normal pushes and pull requests the workflow:
+Expected defaults:
 
-1. runs on `ubuntu-24.04`
-2. installs PlatformIO
-3. runs `scripts/validate_project.py`
-4. builds with `pio run -e d1_mini`
-5. creates the OTA package
-6. verifies the generated files
-7. uploads `esp8266-moisture-sensor-v0.1.2` as a GitHub Actions artifact
-
-For pushed version tags (`v*`) it additionally:
-
-8. creates the matching GitHub Release if needed
-9. uploads the built firmware files directly to the GitHub Release assets
-
-Expected GitHub Release assets:
-
-- `firmware.bin`
-- `firmware.bin.sha256`
-- `manifest.json`
-- `README.md`
+- AP SSID: `MoistureSensor-<CHIPID>`
+- device name: `SoilSensor-1`
+- AP password: `MS-Setup-8266`
 
 ## Local firmware build
 
 ```powershell
 pio run -e d1_mini
 ```
-
-## Repository release-document policy
-
-Only the current source version keeps these release documents:
-
-- `BUILD_STATUS.md`
-- `RELEASE_NOTES.md`
-
-Historical `BUILD_STATUS_v*.md` and `RELEASE_NOTES_v*.md` files are not added.

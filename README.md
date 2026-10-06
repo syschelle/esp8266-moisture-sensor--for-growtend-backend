@@ -1,8 +1,8 @@
 # ESP8266 Moisture Sensor for GrowTent Backend
 
-Firmware for a small Wi-Fi soil-moisture sensor based on the ESP8266. The project is derived conceptually from `espDisplay`, but has **no local display**. It reads one capacitive analog soil-moisture sensor and exposes the current value to the GrowTent backend over HTTP.
+This ESP8266-based sensor reads one capacitive analog soil-moisture sensor and exposes the current moisture value via HTTP for direct integration with the `syschelle/growtent-backend` project.
 
-**Current version: v0.1.2**
+**Current version: v0.1.3**
 
 ## Hardware
 
@@ -55,7 +55,7 @@ Example:
   "device": "SoilSensor-1",
   "sensor": "Topf 1",
   "signal_pin": "A0",
-  "firmware_version": "0.1.2",
+  "firmware_version": "0.1.3",
   "raw_adc": 487,
   "moisture_percent": 63.4,
   "calibrated": true,
@@ -148,7 +148,7 @@ Measurements themselves are RAM-only.
 
 ## OTA
 
-OTA follows the same browser-assisted concept used by espDisplay:
+OTA follows the same browser-assisted concept used by ESP8266 Moisture Sensor:
 
 1. the browser requests the OTA manifest from the repository `ota` branch
 2. the browser downloads `firmware.bin`
@@ -180,7 +180,7 @@ Every build on `main`, every pull request, and every manually started workflow p
 
 After a successful workflow run, open the run summary and download:
 
-`esp8266-moisture-sensor-v0.1.2`
+`esp8266-moisture-sensor-v0.1.3`
 
 The artifact contains:
 
@@ -194,7 +194,7 @@ The workflow uses a fixed `ubuntu-24.04` runner image rather than `ubuntu-latest
 
 ## GitHub Release assets
 
-When a version tag such as `v0.1.2` is pushed, GitHub Actions now also creates or updates the matching GitHub Release and uploads the built firmware directly to **Releases -> Assets**.
+When a version tag such as `v0.1.3` is pushed, GitHub Actions now also creates or updates the matching GitHub Release and uploads the built firmware directly to **Releases -> Assets**.
 
 Release assets:
 

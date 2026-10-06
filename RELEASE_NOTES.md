@@ -1,26 +1,35 @@
-# ESP8266 Moisture Sensor v0.1.13
+# ESP8266 Moisture Sensor v0.1.14
 
-This release fixes the main content being hidden underneath the fixed top header.
+This release changes the browser tab title to use the configured sensor name.
 
-## UI layout fix
+## Browser tab title
 
-The top header is fixed at 49 px height. The main content previously started too close to the top of the viewport, causing the page title and the upper-right status badge to be partially covered by the header.
+The web interface now sets `document.title` from the current sensor configuration.
 
-The desktop content area now includes the header height in its top spacing.
+Priority:
 
-Desktop:
+1. sensor name
+2. device name
+3. `ESP8266 Moisture Sensor` fallback
 
-- fixed header: 49 px
-- content top padding: 87 px
+Example:
 
-Tablet layout receives the same correction.
+If the configured sensor name is:
 
-The mobile layout is unchanged because the top header becomes static there.
+`Topf 1`
+
+the browser tab will display:
+
+`Topf 1`
+
+instead of:
+
+`ESP8266 Moisture Sensor`
 
 ## Tests
 
-The internal regression suite now checks that the desktop and tablet layouts keep the required clearance below the fixed header.
+The internal regression suite now verifies the dynamic browser title behavior and fallback title.
 
 ## Version
 
-v0.1.13
+v0.1.14

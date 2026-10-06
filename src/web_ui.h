@@ -7,7 +7,7 @@ static const char WEB_UI[] PROGMEM = R"HTML(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ESP8266 Moisture Sensor</title>
+<title>SoilSensor</title>
 <style>
 :root{--top:#2f465c;--side:#38546d;--side-active:#314b63;--bg:#f4f4f4;--card:#fff;--text:#222;--muted:#858585;--line:#dcdcdc;--good:#087b35;--warn:#b66b00;--bad:#b42318;--primary:#2f65d9;--shadow:0 2px 7px rgba(0,0,0,.10)}
 :root[data-theme="dark"]{--top:#1f2e3c;--side:#293f52;--side-active:#213547;--bg:#121920;--card:#1a232c;--text:#edf2f7;--muted:#9da8b2;--line:#34414c;--good:#45c976;--warn:#f0b84b;--bad:#ef6a6a;--primary:#6da8ff;--shadow:none}
@@ -229,6 +229,7 @@ async function loadState(forceFormFill=false){
  try{
    S=await api('/api/state');lang=S.settings.language||'de';applyI18n();setTheme(S.settings.theme||'light');
    topBrand.textContent=S.settings.device_name||'ESP8266 Moisture Sensor';
+   document.title=S.settings.sensor_name||S.settings.device_name||'ESP8266 Moisture Sensor';
 
    let connected=!!S.wifi.connected, ap=!!S.wifi.ap_active;
    if(connected)badge(connBadge,tr('connected'),'good');else if(ap)badge(connBadge,tr('apMode'),'warn');else badge(connBadge,tr('offline'),'bad');

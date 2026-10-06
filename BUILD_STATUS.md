@@ -1,12 +1,12 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.13
+# Build / validation status — ESP8266 Moisture Sensor v0.1.14
 
 ## Completed in the artifact environment
 
 - static project validation: PASS
 - internal regression tests: PASS
-- fixed-header desktop clearance: PASS
-- fixed-header tablet clearance: PASS
-- mobile static-header layout retained: PASS
+- browser tab uses sensor name: PASS
+- device-name fallback retained: PASS
+- static HTML title fallback retained: PASS
 - JavaScript syntax: PASS
 - ZIP packaging and SHA-256 generation: PASS
 

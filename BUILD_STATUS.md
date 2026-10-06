@@ -1,4 +1,4 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.0
+# Build / validation status — ESP8266 Moisture Sensor v0.1.1
 
 ## Completed in the artifact environment
 
@@ -10,26 +10,42 @@
 - Wi-Fi fallback AP configuration presence: PASS
 - OTA repository / manifest configuration presence: PASS
 - canonical release-document policy: PASS
-- JavaScript extraction and syntax check: PASS
+- JavaScript syntax check: PASS
+- GitHub Actions firmware-artifact workflow validation: PASS
 - ZIP packaging and SHA-256 generation: PASS
 
-## Not available in this environment
+## GitHub Actions workflow
 
-PlatformIO (`pio`) is not installed in the artifact environment, so the real ESP8266 compile/link build was not executed here.
+The workflow now:
 
-Before tagging the release, run:
+1. runs on `ubuntu-24.04`
+2. installs PlatformIO
+3. runs `scripts/validate_project.py`
+4. builds with `pio run -e d1_mini`
+5. creates the OTA package with `scripts/make_ota.py`
+6. verifies the generated files
+7. uploads `esp8266-moisture-sensor-v0.1.1` as a GitHub Actions artifact
+
+Expected artifact contents:
+
+- `firmware.bin`
+- `firmware.bin.sha256`
+- `manifest.json`
+- `README.md`
+
+## Local firmware build
+
+The authoritative local build command remains:
 
 ```powershell
 pio run -e d1_mini
 ```
 
-A successful PlatformIO build is the authoritative firmware compile/link validation.
-
 ## Repository release-document policy
 
-Only the current files are kept in the repository root:
+Only the current source version keeps these release documents in the repository root:
 
 - `BUILD_STATUS.md`
 - `RELEASE_NOTES.md`
 
-Do not add historical `BUILD_STATUS_v*.md` or `RELEASE_NOTES_v*.md` files.
+Historical `BUILD_STATUS_v*.md` and `RELEASE_NOTES_v*.md` files are not added.

@@ -14,8 +14,8 @@ ui = (root / "src" / "web_ui.h").read_text(encoding="utf-8")
 readme = (root / "README.md").read_text(encoding="utf-8")
 release = (root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
 
-require('#define APP_VERSION "0.1.0"' in version_h, "version header")
-require("v0.1.0" in readme and "v0.1.0" in release, "release version consistency")
+require('#define APP_VERSION "0.1.1"' in version_h, "version header")
+require("v0.1.1" in readme and "v0.1.1" in release, "release version consistency")
 require('"/api/current-values"' in main, "current-values API")
 require('"/api/health"' in main, "health API")
 require('pin != "A0"' in main, "A0 pin validation")
@@ -25,6 +25,14 @@ require("esp8266-moisture-sensor--for-growtend-backend" in version_h, "OTA repos
 require("TM1637" not in main and "TM1637" not in ui, "no display runtime code")
 require(not list(root.glob("BUILD_STATUS_v*.md")), "no historical build status files")
 require(not list(root.glob("RELEASE_NOTES_v*.md")), "no historical release notes files")
+
+workflow = (root / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+require("runs-on: ubuntu-24.04" in workflow, "fixed Ubuntu runner")
+require("pio run -e d1_mini" in workflow, "PlatformIO firmware build")
+require("python scripts/make_ota.py" in workflow, "OTA package creation")
+require("actions/upload-artifact@v4" in workflow, "firmware artifact upload")
+require("esp8266-moisture-sensor-v0.1.1" in workflow, "versioned firmware artifact name")
+require("ota-dist/firmware.bin" in workflow, "firmware.bin artifact")
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

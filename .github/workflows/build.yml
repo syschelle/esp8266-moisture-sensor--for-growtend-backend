@@ -8,15 +8,45 @@ on:
 
 jobs:
   platformio:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+
       - name: Install PlatformIO
         run: pip install platformio
+
       - name: Static validation
         run: python scripts/validate_project.py
+
       - name: Build firmware
         run: pio run -e d1_mini
+
+      - name: Create OTA package
+        run: python scripts/make_ota.py
+
+      - name: Verify firmware package
+        run: |
+          test -f ota-dist/firmware.bin
+          test -f ota-dist/firmware.bin.sha256
+          test -f ota-dist/manifest.json
+          test -f ota-dist/README.md
+          ls -lh ota-dist/
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp8266-moisture-sensor-v0.1.1
+          path: |
+            ota-dist/firmware.bin
+            ota-dist/firmware.bin.sha256
+            ota-dist/manifest.json
+            ota-dist/README.md
+          if-no-files-found: error
+          retention-days: 30

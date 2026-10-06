@@ -1,79 +1,48 @@
-# ESP8266 Moisture Sensor v0.1.0
+# ESP8266 Moisture Sensor v0.1.1
 
-Initial release of the ESP8266 soil-moisture sensor for integration with the GrowTent backend.
+This release improves the GitHub Actions build pipeline so every successful CI build provides a downloadable firmware package.
 
-## Highlights
+## GitHub Actions
 
-- ESP8266 / Wemos D1 mini PlatformIO project
-- one capacitive analog soil-moisture sensor
-- no local TM1637 or other display
-- configurable signal-pin setting in the web interface
-- ESP8266 analog input currently restricted to `A0`
-- adjustable measurement interval
-- configurable ADC sample count
-- averaged and smoothed ADC measurements
-- dry/wet two-point calibration
-- calculated soil moisture from 0 to 100 %
-- REST endpoint `GET /api/current-values`
-- health endpoint `GET /api/health`
-- responsive German/English web interface
-- light/dark theme
-- Wi-Fi fallback AP provisioning
-- NTP synchronization at boot
-- EEPROM-backed persistent settings with CRC32
-- system log
-- browser-assisted OTA update flow
-- manual firmware upload
-- factory reset
+- pins the hosted runner to `ubuntu-24.04`
+- runs the existing static validation
+- builds the ESP8266 firmware with PlatformIO
+- creates the OTA package with `scripts/make_ota.py`
+- verifies that all expected OTA files were generated
+- uploads the generated files as a GitHub Actions artifact
+- names the artifact `esp8266-moisture-sensor-v0.1.1`
+- keeps the artifact for 30 days
 
-## GrowTent backend API
+## Firmware artifact contents
 
-The intended integration endpoint is:
+The downloadable GitHub Actions artifact contains:
 
-`http://<sensor-ip>/api/current-values`
-
-The response includes:
-
-- device name
-- sensor name
-- signal pin
-- firmware version
-- raw ADC value
-- moisture percentage
-- calibration state
-- last measurement timestamp
-- Wi-Fi RSSI
-- uptime
-
-## Default access point
-
-- SSID: `MoistureSensor-<CHIPID>`
-- password: `MS-Setup-8266`
-
-## OTA channel
-
-Repository:
-
-`syschelle/esp8266-moisture-sensor--for-growtend-backend`
-
-Branch:
-
-`ota`
-
-Expected OTA branch files:
-
-- `manifest.json`
 - `firmware.bin`
 - `firmware.bin.sha256`
+- `manifest.json`
 - `README.md`
 
-## Platform
+The artifact is available from the workflow run summary after a successful build.
 
-- ESP8266
-- Arduino framework
-- PlatformIO
-- Wemos/Lolin D1 mini compatible target
+## Firmware functionality
 
-## License
+The sensor firmware itself is unchanged from v0.1.0:
 
-Apache License 2.0
+- ESP8266 / Wemos D1 mini target
+- capacitive analog soil-moisture sensor on A0
+- configurable signal-pin setting in the web interface
+- averaged and smoothed ADC measurements
+- dry/wet calibration
+- 0 to 100 % moisture calculation
+- `/api/current-values`
+- `/api/health`
+- Wi-Fi fallback AP
+- NTP
+- German/English web interface
+- light/dark theme
+- browser-assisted OTA
+- factory reset
+
+## Version
+
+v0.1.1

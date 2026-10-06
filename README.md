@@ -2,7 +2,7 @@
 
 Firmware for a small Wi-Fi soil-moisture sensor based on the ESP8266. The project is derived conceptually from `espDisplay`, but has **no local display**. It reads one capacitive analog soil-moisture sensor and exposes the current value to the GrowTent backend over HTTP.
 
-**Current version: v0.1.0**
+**Current version: v0.1.1**
 
 ## Hardware
 
@@ -55,7 +55,7 @@ Example:
   "device": "SoilSensor-1",
   "sensor": "Topf 1",
   "signal_pin": "A0",
-  "firmware_version": "0.1.0",
+  "firmware_version": "0.1.1",
   "raw_adc": 487,
   "moisture_percent": 63.4,
   "calibrated": true,
@@ -167,6 +167,29 @@ OTA branch:
 Manifest URL:
 
 `https://raw.githubusercontent.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/ota/manifest.json`
+
+
+## GitHub Actions firmware artifact
+
+Every build on `main`, every pull request, and every manually started workflow performs:
+
+1. static project validation
+2. PlatformIO build for `d1_mini`
+3. creation of the OTA package
+4. upload of the generated firmware package as a GitHub Actions artifact
+
+After a successful workflow run, open the run summary and download:
+
+`esp8266-moisture-sensor-v0.1.1`
+
+The artifact contains:
+
+- `firmware.bin`
+- `firmware.bin.sha256`
+- `manifest.json`
+- `README.md`
+
+The workflow uses a fixed `ubuntu-24.04` runner image rather than `ubuntu-latest`.
 
 ## Build
 

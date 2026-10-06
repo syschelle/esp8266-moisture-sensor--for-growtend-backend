@@ -1,25 +1,26 @@
-# ESP8266 Moisture Sensor v0.1.12
+# ESP8266 Moisture Sensor v0.1.13
 
-This release fixes an IntelliSense / C++ type mismatch in the OTA download buffer calculation.
+This release fixes the main content being hidden underneath the fixed top header.
 
-## Build fix
+## UI layout fix
 
-The previous code used:
+The top header is fixed at 49 px height. The main content previously started too close to the top of the viewport, causing the page title and the upper-right status badge to be partially covered by the header.
 
-`min(available, sizeof(buffer))`
+The desktop content area now includes the header height in its top spacing.
 
-Depending on the host/compiler type definitions, the arguments can be interpreted as different unsigned integer types (`size_t` vs. `unsigned long long`), which causes overload resolution to fail.
+Desktop:
 
-The code now uses an explicit type-safe conditional expression:
+- fixed header: 49 px
+- content top padding: 87 px
 
-`size_t want = (available < sizeof(buffer)) ? available : sizeof(buffer);`
+Tablet layout receives the same correction.
 
-This removes the overload ambiguity without changing behavior.
+The mobile layout is unchanged because the top header becomes static there.
 
 ## Tests
 
-The internal regression test suite now checks that the mixed-type `min()` expression is not reintroduced.
+The internal regression suite now checks that the desktop and tablet layouts keep the required clearance below the fixed header.
 
 ## Version
 
-v0.1.12
+v0.1.13

@@ -18,7 +18,7 @@ html,body{margin:0;min-height:100%;font-family:Segoe UI,Arial,sans-serif;backgro
 .sidebar{position:fixed;left:0;top:49px;bottom:0;width:205px;background:var(--side);padding-top:7px;z-index:15}
 .navbtn{display:block;width:100%;border:0;background:transparent;color:#fff;text-align:left;padding:14px 13px;font-size:15px;cursor:pointer}
 .navbtn:hover,.navbtn.active{background:var(--side-active)}
-.content{margin-left:205px;padding:38px 32px 40px;min-height:100vh}
+.content{margin-left:205px;padding:87px 32px 40px;min-height:100vh}
 .page{display:none}.page.active{display:block}
 .headrow{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:29px}
 h1{font-size:30px;line-height:1.2;margin:0 0 17px;font-weight:700}
@@ -43,7 +43,7 @@ button.secondary{background:transparent;color:var(--text);border:1px solid var(-
 .hint{color:var(--muted);font-size:12px;margin-top:7px}.saveState{font-size:12px;margin-top:10px;color:var(--muted)}
 pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:7px;overflow:auto;max-height:520px;white-space:pre-wrap}
 .progress{height:9px;background:var(--line);border-radius:999px;overflow:hidden;margin-top:15px}.progress span{display:block;height:100%;width:0;background:var(--primary)}
-@media(max-width:850px){.sidebar{width:175px}.content{margin-left:175px;padding:26px 18px}.grid2{grid-template-columns:1fr}}
+@media(max-width:850px){.sidebar{width:175px}.content{margin-left:175px;padding:75px 18px 26px}.grid2{grid-template-columns:1fr}}
 @media(max-width:620px){.topbar{position:static}.sidebar{position:static;width:auto;display:flex;overflow:auto;padding:0}.navbtn{width:auto;white-space:nowrap;padding:12px}.content{margin-left:0;padding:18px 12px}.headrow{margin-bottom:18px}.hero-value{font-size:40px}}
 </style>
 </head>

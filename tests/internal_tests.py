@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.12", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.12", "0.1.12"))
+check("version newer patch", is_newer("0.1.13", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.13", "0.1.13"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -82,6 +82,9 @@ check("settings dirty-state guard", "formDirty" in UI)
 check("status-only normal polling", "activePage==='status'" in UI)
 check("System log live refresh", "if(activePage==='log')loadLog()" in UI)
 
+check("fixed header content clearance", ".content{margin-left:205px;padding:87px 32px 40px" in UI)
+check("tablet header content clearance", ".content{margin-left:175px;padding:75px 18px 26px" in UI)
+
 # Release pipeline
 check("tag workflow", 'tags:' in WORKFLOW and '"v*"' in WORKFLOW)
 check("release asset upload", "gh release upload" in WORKFLOW)
@@ -92,7 +95,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.12", bool(m) and m.group(1) == "0.1.12")
+check("firmware version 0.1.13", bool(m) and m.group(1) == "0.1.13")
 
 if failures:
     print("\nInternal regression tests failed:")

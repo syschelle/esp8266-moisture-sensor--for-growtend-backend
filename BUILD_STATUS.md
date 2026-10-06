@@ -1,33 +1,25 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.6
+# Build / validation status — ESP8266 Moisture Sensor v0.1.7
 
 ## Completed in the artifact environment
 
 - project structure validation: PASS
 - release version consistency: PASS
-- current-values API route: PASS
-- health API route: PASS
-- A0 signal-pin validation: PASS
-- calibration guard: PASS
-- configuration-form refresh protection: PASS
-- GitHub Actions firmware build/artifact workflow: PASS
-- GitHub Release asset publishing workflow: PASS
-- latest-release OTA manifest URL: PASS
-- latest-release firmware URL in generated manifest: PASS
-- no OTA branch dependency: PASS
+- local OTA check endpoint: PASS
+- local OTA update endpoint: PASS
+- ESP-side HTTPS manifest fetch: PASS
+- ESP-side HTTPS firmware download: PASS
+- HTTP redirect following: PASS
+- streamed SHA-256 implementation: PASS
+- browser no longer fetches GitHub OTA assets directly: PASS
+- manual OTA upload retained: PASS
 - JavaScript syntax: PASS
+- GitHub Actions firmware build/artifact workflow: PASS
+- GitHub Release asset workflow: PASS
 - ZIP packaging and SHA-256 generation: PASS
 
-## OTA source
+## Important
 
-Manifest:
-
-`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/manifest.json`
-
-Firmware:
-
-`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/firmware.bin`
-
-No separate OTA branch is required.
+The real ESP8266 compile/link build must still be confirmed by PlatformIO/GitHub Actions.
 
 ## Local build
 

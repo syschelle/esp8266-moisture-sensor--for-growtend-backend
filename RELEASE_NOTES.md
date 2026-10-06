@@ -1,42 +1,37 @@
-# ESP8266 Moisture Sensor v0.1.6
+# ESP8266 Moisture Sensor v0.1.7
 
-This release fixes OTA update checks by switching completely from the unused `ota` branch to GitHub Release assets.
+This release fixes the OTA `Failed to fetch` error.
 
-## OTA fix
+## OTA architecture
 
-The firmware no longer requests:
+The browser no longer downloads GitHub release assets directly.
 
-`https://raw.githubusercontent.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/ota/manifest.json`
+New local endpoints:
 
-That URL returned HTTP 404 because no dedicated OTA branch is required by the current release workflow.
+- `GET /api/ota/check`
+- `POST /api/ota/update`
 
-The firmware now uses the latest GitHub Release directly:
+The ESP8266 now performs the complete GitHub OTA transaction itself.
 
-`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/manifest.json`
+## Automatic update flow
 
-The generated manifest points to:
+1. browser asks the local ESP for an update check
+2. ESP downloads `manifest.json` from the latest GitHub Release
+3. ESP compares firmware versions
+4. browser starts the update through the local endpoint
+5. ESP downloads `firmware.bin`
+6. firmware size is checked
+7. SHA-256 is calculated while streaming
+8. SHA-256 is compared with the manifest
+9. the update is finalized only after successful verification
+10. ESP reboots
 
-`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/firmware.bin`
+This removes browser CORS and GitHub redirect issues from the OTA process.
 
-## Release workflow
+## Manual OTA
 
-The existing tag workflow already builds and publishes:
-
-- `firmware.bin`
-- `firmware.bin.sha256`
-- `manifest.json`
-- `README.md`
-
-These files are now both published and consumed from the same GitHub Release path.
-
-## Result
-
-The OTA process now has one consistent source of truth:
-
-`Git tag -> GitHub Actions -> GitHub Release -> OTA update`
-
-No separate `ota` branch is needed.
+Manual local `firmware.bin` upload remains available as a fallback.
 
 ## Version
 
-v0.1.6
+v0.1.7

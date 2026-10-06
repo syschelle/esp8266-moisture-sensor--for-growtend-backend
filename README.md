@@ -2,7 +2,7 @@
 
 This ESP8266-based sensor reads one capacitive analog soil-moisture sensor and exposes the current moisture value via HTTP for direct integration with the `syschelle/growtent-backend` project.
 
-**Current version: v0.1.6**
+**Current version: v0.1.7**
 
 ## Scope
 
@@ -35,7 +35,7 @@ Verify the accepted ADC input voltage for the exact ESP8266 board before connect
 
 The signal pin is configurable in the web interface.
 
-On ESP8266 v0.1.6 the supported analog input is:
+On ESP8266 v0.1.7 the supported analog input is:
 
 `A0`
 
@@ -102,7 +102,7 @@ Example:
   "device": "SoilSensor-1",
   "sensor": "Topf 1",
   "signal_pin": "A0",
-  "firmware_version": "0.1.6",
+  "firmware_version": "0.1.7",
   "raw_adc": 487,
   "moisture_percent": 63.4,
   "calibrated": true,
@@ -161,31 +161,29 @@ Pushing a version tag triggers a firmware build. The GitHub Release receives:
 
 ## OTA
 
-OTA uses the latest published GitHub Release of this repository. No separate `ota` branch is required.
+OTA checks and firmware downloads are performed by the ESP8266 itself. The browser only communicates with the local device, so browser CORS and GitHub redirect behavior do not affect the update flow.
 
-Manifest:
+Local OTA endpoints:
+
+- `GET /api/ota/check`
+- `POST /api/ota/update`
+
+The ESP8266 loads the manifest from the latest GitHub Release:
 
 `https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/manifest.json`
 
-Firmware:
+Automatic OTA flow:
 
-`https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/firmware.bin`
+1. ESP downloads `manifest.json`
+2. ESP compares versions
+3. ESP downloads `firmware.bin` over HTTPS
+4. ESP verifies the expected size
+5. ESP calculates SHA-256 while streaming the firmware
+6. ESP compares SHA-256 with the manifest
+7. ESP finalizes the update only after successful verification
+8. ESP reboots
 
-The browser-assisted update process is:
-
-1. load `manifest.json` from the latest GitHub Release
-2. compare the release version with the installed firmware
-3. download `firmware.bin`
-4. verify file size and SHA-256 from the manifest
-5. upload the verified firmware to the ESP8266 over the local HTTP connection
-6. reboot after a successful flash
-
-The release workflow publishes these files directly under **GitHub Releases -> Assets**:
-
-- `firmware.bin`
-- `firmware.bin.sha256`
-- `manifest.json`
-- `README.md`
+Manual local `firmware.bin` upload remains available as a fallback.
 
 ## License
 

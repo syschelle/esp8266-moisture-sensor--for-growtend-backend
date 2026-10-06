@@ -287,25 +287,31 @@ async function calibrate(which){try{await postForm('/api/calibration/'+which,{})
 async function loadLog(){try{let r=await fetch('/api/log');logText.textContent=await r.text()}catch(e){logText.textContent=e.message}}
 async function reboot(){if(confirm('Reboot?')){await postForm('/api/reboot',{})}}
 async function factoryReset(){if(confirm(lang==='de'?'Wirklich alle Einstellungen löschen?':'Really erase all settings?')){await postForm('/api/factory-reset',{})}}
-function semver(v){return String(v||'0').replace(/^v/,'').split('.').map(x=>parseInt(x,10)||0)}
-function newer(a,b){let A=semver(a),B=semver(b);for(let i=0;i<3;i++){if((A[i]||0)>(B[i]||0))return true;if((A[i]||0)<(B[i]||0))return false}return false}
-async function sha256Hex(buf){let h=await crypto.subtle.digest('SHA-256',buf);return Array.from(new Uint8Array(h)).map(x=>x.toString(16).padStart(2,'0')).join('')}
-async function uploadBuf(buf){
- let blob=new Blob([buf],{type:'application/octet-stream'}),fd=new FormData();fd.append('firmware',blob,'firmware.bin');
- otaProgress.style.width='10%';let r=await fetch('/api/ota/upload',{method:'POST',body:fd}),t=await r.text(),j={};try{j=JSON.parse(t)}catch(e){}
- if(!r.ok)throw Error(j.error||t||'OTA failed');otaProgress.style.width='100%';otaMsg.textContent='Update OK – rebooting...'
-}
 async function checkOta(){
  try{
-  otaMsg.textContent='Manifest...';let c=await api('/api/ota/config'),mr=await fetch(c.manifest_url,{cache:'no-store'});if(!mr.ok)throw Error('Manifest HTTP '+mr.status);
-  let m=await mr.json();otaAvailable.textContent='v'+String(m.version||'').replace(/^v/,'');
-  if(!newer(m.version,S.version)){otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';return}
-  if(!confirm('Version '+m.version+' install?'))return;
-  let rr=await fetch(m.url,{cache:'no-store'});if(!rr.ok)throw Error('Firmware HTTP '+rr.status);let buf=await rr.arrayBuffer();
-  if(m.size&&Number(m.size)!==buf.byteLength)throw Error('Firmware size mismatch');
-  if(m.sha256){let h=await sha256Hex(buf);if(h.toLowerCase()!==String(m.sha256).toLowerCase())throw Error('SHA-256 mismatch')}
-  await uploadBuf(buf);
- }catch(e){otaMsg.textContent=e.message}
+  otaMsg.textContent=lang==='de'?'Prüfe Update…':'Checking update…';
+  otaProgress.style.width='0';
+  let c=await api('/api/ota/check');
+  otaAvailable.textContent='v'+String(c.available_version||'').replace(/^v/,'');
+  if(!c.update_available){
+    otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';
+    return;
+  }
+  if(!confirm((lang==='de'?'Version ':'Version ')+c.available_version+(lang==='de'?' installieren?':' install?')))return;
+  otaMsg.textContent=lang==='de'?'Firmware wird vom ESP heruntergeladen und installiert…':'ESP is downloading and installing firmware…';
+  otaProgress.style.width='35%';
+  let r=await api('/api/ota/update',{method:'POST'});
+  if(r.updated){
+    otaProgress.style.width='100%';
+    otaMsg.textContent=lang==='de'?'Update installiert – Neustart…':'Update installed – rebooting…';
+  }else{
+    otaProgress.style.width='0';
+    otaMsg.textContent=r.message||'No update';
+  }
+ }catch(e){
+  otaProgress.style.width='0';
+  otaMsg.textContent=e.message;
+ }
 }
 async function manualUpload(){try{let f=fwFile.files[0];if(!f)throw Error('Select firmware.bin');await uploadBuf(await f.arrayBuffer())}catch(e){otaMsg.textContent=e.message}}
 document.querySelectorAll('#sensor input,#sensor select,#system input,#system select').forEach(el=>{

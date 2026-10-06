@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <Updater.h>
@@ -269,7 +271,327 @@ static void configureTime() {
   addLog("NTP configured: " + String(cfg.ntpServer));
 }
 
-static void sendJson(JsonDocument& doc, int status = 200) {
+
+static void sendJson(JsonDocument& doc, int status = 200);
+static void sendError(int status, const String& msg);
+static void scheduleRestart(uint32_t delayMs = 800);
+
+class Sha256Tiny {
+public:
+  Sha256Tiny() { reset(); }
+
+  void reset() {
+    totalLen = 0;
+    bufferLen = 0;
+    h[0]=0x6a09e667UL; h[1]=0xbb67ae85UL; h[2]=0x3c6ef372UL; h[3]=0xa54ff53aUL;
+    h[4]=0x510e527fUL; h[5]=0x9b05688cUL; h[6]=0x1f83d9abUL; h[7]=0x5be0cd19UL;
+  }
+
+  void update(const uint8_t* data, size_t len) {
+    totalLen += len;
+    while (len) {
+      size_t take = min((size_t)64 - bufferLen, len);
+      memcpy(buffer + bufferLen, data, take);
+      bufferLen += take;
+      data += take;
+      len -= take;
+      if (bufferLen == 64) {
+        transform(buffer);
+        bufferLen = 0;
+      }
+    }
+  }
+
+  String finalHex() {
+    const uint64_t bitLen = totalLen * 8ULL;
+    buffer[bufferLen++] = 0x80;
+    if (bufferLen > 56) {
+      while (bufferLen < 64) buffer[bufferLen++] = 0;
+      transform(buffer);
+      bufferLen = 0;
+    }
+    while (bufferLen < 56) buffer[bufferLen++] = 0;
+    for (int i = 7; i >= 0; --i) buffer[bufferLen++] = (uint8_t)(bitLen >> (i * 8));
+    transform(buffer);
+
+    char out[65];
+    for (int i = 0; i < 8; ++i) snprintf(out + i * 8, 9, "%08lx", (unsigned long)h[i]);
+    out[64] = '\0';
+    return String(out);
+  }
+
+private:
+  uint32_t h[8];
+  uint8_t buffer[64];
+  size_t bufferLen = 0;
+  uint64_t totalLen = 0;
+
+  static uint32_t rotr(uint32_t x, uint8_t n) { return (x >> n) | (x << (32 - n)); }
+
+  void transform(const uint8_t block[64]) {
+    static const uint32_t k[64] = {
+      0x428a2f98UL,0x71374491UL,0xb5c0fbcfUL,0xe9b5dba5UL,0x3956c25bUL,0x59f111f1UL,0x923f82a4UL,0xab1c5ed5UL,
+      0xd807aa98UL,0x12835b01UL,0x243185beUL,0x550c7dc3UL,0x72be5d74UL,0x80deb1feUL,0x9bdc06a7UL,0xc19bf174UL,
+      0xe49b69c1UL,0xefbe4786UL,0x0fc19dc6UL,0x240ca1ccUL,0x2de92c6fUL,0x4a7484aaUL,0x5cb0a9dcUL,0x76f988daUL,
+      0x983e5152UL,0xa831c66dUL,0xb00327c8UL,0xbf597fc7UL,0xc6e00bf3UL,0xd5a79147UL,0x06ca6351UL,0x14292967UL,
+      0x27b70a85UL,0x2e1b2138UL,0x4d2c6dfcUL,0x53380d13UL,0x650a7354UL,0x766a0abbUL,0x81c2c92eUL,0x92722c85UL,
+      0xa2bfe8a1UL,0xa81a664bUL,0xc24b8b70UL,0xc76c51a3UL,0xd192e819UL,0xd6990624UL,0xf40e3585UL,0x106aa070UL,
+      0x19a4c116UL,0x1e376c08UL,0x2748774cUL,0x34b0bcb5UL,0x391c0cb3UL,0x4ed8aa4aUL,0x5b9cca4fUL,0x682e6ff3UL,
+      0x748f82eeUL,0x78a5636fUL,0x84c87814UL,0x8cc70208UL,0x90befffaUL,0xa4506cebUL,0xbef9a3f7UL,0xc67178f2UL
+    };
+    uint32_t w[64];
+    for (int i=0;i<16;++i) {
+      w[i] = ((uint32_t)block[i*4] << 24) | ((uint32_t)block[i*4+1] << 16) | ((uint32_t)block[i*4+2] << 8) | block[i*4+3];
+    }
+    for (int i=16;i<64;++i) {
+      uint32_t s0 = rotr(w[i-15],7) ^ rotr(w[i-15],18) ^ (w[i-15] >> 3);
+      uint32_t s1 = rotr(w[i-2],17) ^ rotr(w[i-2],19) ^ (w[i-2] >> 10);
+      w[i] = w[i-16] + s0 + w[i-7] + s1;
+    }
+
+    uint32_t a=h[0],b=h[1],c=h[2],d=h[3],e=h[4],f=h[5],g=h[6],hh=h[7];
+    for (int i=0;i<64;++i) {
+      uint32_t S1 = rotr(e,6) ^ rotr(e,11) ^ rotr(e,25);
+      uint32_t ch = (e & f) ^ ((~e) & g);
+      uint32_t t1 = hh + S1 + ch + k[i] + w[i];
+      uint32_t S0 = rotr(a,2) ^ rotr(a,13) ^ rotr(a,22);
+      uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
+      uint32_t t2 = S0 + maj;
+      hh=g; g=f; f=e; e=d+t1; d=c; c=b; b=a; a=t1+t2;
+    }
+    h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=hh;
+  }
+};
+
+struct OtaManifest {
+  String version;
+  String url;
+  String sha256;
+  size_t size = 0;
+};
+
+static bool parseVersionPart(const String& v, int part, int& out) {
+  String s = v;
+  if (s.startsWith("v")) s.remove(0, 1);
+  int start = 0;
+  for (int i = 0; i <= part; ++i) {
+    int dot = s.indexOf('.', start);
+    String token = dot >= 0 ? s.substring(start, dot) : s.substring(start);
+    if (!token.length()) return false;
+    for (size_t j=0;j<token.length();++j) if (!isDigit(token[j])) return false;
+    if (i == part) { out = token.toInt(); return true; }
+    if (dot < 0) return false;
+    start = dot + 1;
+  }
+  return false;
+}
+
+static bool isNewerVersion(const String& candidate, const String& current) {
+  for (int i=0;i<3;++i) {
+    int a=0,b=0;
+    if (!parseVersionPart(candidate, i, a) || !parseVersionPart(current, i, b)) return false;
+    if (a > b) return true;
+    if (a < b) return false;
+  }
+  return false;
+}
+
+static bool fetchOtaManifest(OtaManifest& out, String& error) {
+  if (WiFi.status() != WL_CONNECTED) {
+    error = "Wi-Fi not connected";
+    return false;
+  }
+
+  BearSSL::WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(15000);
+
+  HTTPClient http;
+  http.setTimeout(15000);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+  if (!http.begin(client, OTA_MANIFEST_URL)) {
+    error = "Manifest connection failed";
+    return false;
+  }
+
+  int code = http.GET();
+  if (code != HTTP_CODE_OK) {
+    error = "Manifest HTTP " + String(code);
+    http.end();
+    return false;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  DeserializationError jsonError = deserializeJson(doc, payload);
+  if (jsonError) {
+    error = "Manifest JSON invalid";
+    return false;
+  }
+
+  out.version = String(doc["version"] | "");
+  out.url = String(doc["url"] | "");
+  out.sha256 = String(doc["sha256"] | "");
+  out.size = doc["size"] | 0;
+  out.sha256.toLowerCase();
+
+  if (!out.version.length() || !out.url.startsWith("https://") || out.sha256.length() != 64 || out.size < 1024) {
+    error = "Manifest fields invalid";
+    return false;
+  }
+  return true;
+}
+
+static bool downloadAndFlashOta(const OtaManifest& manifest, String& error) {
+  if (WiFi.status() != WL_CONNECTED) {
+    error = "Wi-Fi not connected";
+    return false;
+  }
+
+  size_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+  if (manifest.size > maxSketchSpace) {
+    error = "Firmware too large";
+    return false;
+  }
+
+  BearSSL::WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(20000);
+
+  HTTPClient http;
+  http.setTimeout(20000);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+  if (!http.begin(client, manifest.url)) {
+    error = "Firmware connection failed";
+    return false;
+  }
+
+  int code = http.GET();
+  if (code != HTTP_CODE_OK) {
+    error = "Firmware HTTP " + String(code);
+    http.end();
+    return false;
+  }
+
+  int contentLength = http.getSize();
+  if (contentLength > 0 && (size_t)contentLength != manifest.size) {
+    error = "Firmware size mismatch";
+    http.end();
+    return false;
+  }
+
+  if (!Update.begin(manifest.size)) {
+    error = "Update begin failed";
+    http.end();
+    return false;
+  }
+
+  WiFiClient* stream = http.getStreamPtr();
+  Sha256Tiny sha;
+  uint8_t buffer[1024];
+  size_t total = 0;
+  uint32_t lastDataMs = millis();
+
+  while (http.connected() && total < manifest.size) {
+    size_t available = stream->available();
+    if (available) {
+      size_t want = min(available, sizeof(buffer));
+      size_t got = stream->readBytes(buffer, want);
+      if (got) {
+        lastDataMs = millis();
+        sha.update(buffer, got);
+        if (Update.write(buffer, got) != got) {
+          error = "Firmware flash write failed";
+          http.end();
+          return false;
+        }
+        total += got;
+      }
+    } else {
+      if ((uint32_t)(millis() - lastDataMs) > 20000UL) {
+        error = "Firmware download timeout";
+        http.end();
+        return false;
+      }
+      delay(1);
+      yield();
+    }
+  }
+
+  http.end();
+
+  if (total != manifest.size) {
+    error = "Firmware incomplete";
+    return false;
+  }
+
+  String actualSha = sha.finalHex();
+  if (!actualSha.equalsIgnoreCase(manifest.sha256)) {
+    error = "Firmware SHA-256 mismatch";
+    return false;
+  }
+
+  if (!Update.end(true)) {
+    error = "Firmware finalize failed";
+    return false;
+  }
+  return true;
+}
+
+static void apiOtaCheck() {
+  OtaManifest manifest;
+  String error;
+  if (!fetchOtaManifest(manifest, error)) {
+    sendError(502, error);
+    return;
+  }
+
+  JsonDocument doc;
+  doc["current_version"] = APP_VERSION;
+  doc["available_version"] = manifest.version;
+  doc["update_available"] = isNewerVersion(manifest.version, APP_VERSION);
+  doc["size"] = manifest.size;
+  sendJson(doc);
+}
+
+static void apiOtaUpdate() {
+  OtaManifest manifest;
+  String error;
+  if (!fetchOtaManifest(manifest, error)) {
+    sendError(502, error);
+    return;
+  }
+
+  if (!isNewerVersion(manifest.version, APP_VERSION)) {
+    JsonDocument doc;
+    doc["ok"] = true;
+    doc["updated"] = false;
+    doc["message"] = "No newer version available";
+    sendJson(doc);
+    return;
+  }
+
+  addLog("OTA update started: " + manifest.version);
+  if (!downloadAndFlashOta(manifest, error)) {
+    addLog("OTA update failed: " + error);
+    sendError(502, error);
+    return;
+  }
+
+  addLog("OTA update installed: " + manifest.version);
+  JsonDocument doc;
+  doc["ok"] = true;
+  doc["updated"] = true;
+  doc["version"] = manifest.version;
+  sendJson(doc);
+  scheduleRestart(1200);
+}
+
+static void sendJson(JsonDocument& doc, int status) {
   String out;
   serializeJson(doc, out);
   server.send(status, "application/json; charset=utf-8", out);
@@ -418,7 +740,7 @@ static void calibratePoint(bool dry) {
   JsonDocument doc; doc["ok"] = true; doc["dry_adc"] = cfg.dryAdc; doc["wet_adc"] = cfg.wetAdc; doc["calibrated"] = calibrated(); sendJson(doc);
 }
 
-static void scheduleRestart(uint32_t delayMs = 800) {
+static void scheduleRestart(uint32_t delayMs) {
   restartPending = true;
   restartAt = millis() + delayMs;
 }
@@ -473,6 +795,8 @@ static void setupRoutes() {
   server.on("/api/settings/system", HTTP_POST, saveSystemSettings);
   server.on("/api/calibration/dry", HTTP_POST, [](){ calibratePoint(true); });
   server.on("/api/calibration/wet", HTTP_POST, [](){ calibratePoint(false); });
+  server.on("/api/ota/check", HTTP_GET, apiOtaCheck);
+  server.on("/api/ota/update", HTTP_POST, apiOtaUpdate);
   server.on("/api/ota/config", HTTP_GET, [](){
     JsonDocument doc;
     doc["manifest_url"] = OTA_MANIFEST_URL;

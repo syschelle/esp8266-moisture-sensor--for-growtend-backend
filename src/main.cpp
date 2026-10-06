@@ -265,10 +265,12 @@ static void wifiLoop() {
 }
 
 static void configureTime() {
+  // ESP8266: use the POSIX-TZ configTime overload directly.
+  // This applies CET/CEST including automatic daylight-saving changes.
+  configTime(cfg.timezone, cfg.ntpServer);
   setenv("TZ", cfg.timezone, 1);
   tzset();
-  configTime(0, 0, cfg.ntpServer);
-  addLog("NTP configured: " + String(cfg.ntpServer));
+  addLog("NTP configured: " + String(cfg.ntpServer) + " TZ=" + String(cfg.timezone));
 }
 
 

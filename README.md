@@ -2,7 +2,7 @@
 
 This ESP8266-based sensor reads one capacitive analog soil-moisture sensor and exposes the current moisture value via HTTP for direct integration with the `syschelle/growtent-backend` project.
 
-**Current version: v0.1.7**
+**Current version: v0.1.8**
 
 ## Scope
 
@@ -35,7 +35,7 @@ Verify the accepted ADC input voltage for the exact ESP8266 board before connect
 
 The signal pin is configurable in the web interface.
 
-On ESP8266 v0.1.7 the supported analog input is:
+On ESP8266 v0.1.8 the supported analog input is:
 
 `A0`
 
@@ -102,7 +102,7 @@ Example:
   "device": "SoilSensor-1",
   "sensor": "Topf 1",
   "signal_pin": "A0",
-  "firmware_version": "0.1.7",
+  "firmware_version": "0.1.8",
   "raw_adc": 487,
   "moisture_percent": 63.4,
   "calibrated": true,
@@ -134,6 +134,22 @@ SoilSensor-1
 The default AP address is normally:
 
 `192.168.4.1`
+
+
+## Local time and timezone
+
+The ESP8266 uses the POSIX timezone overload of `configTime()` so that daylight-saving time is handled by the firmware itself.
+
+Default for Germany:
+
+`CET-1CEST,M3.5.0,M10.5.0/3`
+
+This means:
+
+- winter: CET / UTC+1
+- summer: CEST / UTC+2
+
+The configured timezone is applied both during boot and immediately after saving System settings.
 
 ## NTP
 

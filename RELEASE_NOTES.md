@@ -1,37 +1,28 @@
-# ESP8266 Moisture Sensor v0.1.7
+# ESP8266 Moisture Sensor v0.1.8
 
-This release fixes the OTA `Failed to fetch` error.
+This release fixes the two-hour local-time offset observed during daylight-saving time.
 
-## OTA architecture
+## Timezone fix
 
-The browser no longer downloads GitHub release assets directly.
+The previous implementation configured NTP with the integer-offset `configTime()` overload after setting the POSIX timezone separately. On ESP8266 this could result in UTC being shown even though the stored timezone was correct.
 
-New local endpoints:
+The firmware now uses the ESP8266 POSIX timezone overload directly:
 
-- `GET /api/ota/check`
-- `POST /api/ota/update`
+`configTime(cfg.timezone, cfg.ntpServer)`
 
-The ESP8266 now performs the complete GitHub OTA transaction itself.
+The configured timezone is still applied to the C runtime with `TZ` / `tzset()` and timestamps are formatted using `localtime_r()`.
 
-## Automatic update flow
+Default timezone:
 
-1. browser asks the local ESP for an update check
-2. ESP downloads `manifest.json` from the latest GitHub Release
-3. ESP compares firmware versions
-4. browser starts the update through the local endpoint
-5. ESP downloads `firmware.bin`
-6. firmware size is checked
-7. SHA-256 is calculated while streaming
-8. SHA-256 is compared with the manifest
-9. the update is finalized only after successful verification
-10. ESP reboots
+`CET-1CEST,M3.5.0,M10.5.0/3`
 
-This removes browser CORS and GitHub redirect issues from the OTA process.
+This automatically provides:
 
-## Manual OTA
+- CET / UTC+1 in winter
+- CEST / UTC+2 in summer
 
-Manual local `firmware.bin` upload remains available as a fallback.
+Saving System settings immediately reapplies NTP and the timezone; a reboot is not required.
 
 ## Version
 
-v0.1.7
+v0.1.8

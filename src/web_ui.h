@@ -195,7 +195,7 @@ de:{
  checkUpdate:'Update prüfen',installUpdate:'Update installieren',updateChanges:'Änderungen der verfügbaren Firmware',manualUpdate:'Manuelles Firmware-Update',uploadFirmware:'Firmware hochladen',
  resetText:'Alle gespeicherten Einstellungen einschließlich WLAN und Sensorkalibrierung werden gelöscht.',
  resetButton:'Werkseinstellungen laden',connected:'Verbunden',apMode:'AP-Modus',offline:'Nicht erreichbar',
- calibrated:'Kalibriert',notCalibrated:'Nicht kalibriert',active:'Aktiv',waiting:'Warte auf Messung',synchronized:'Synchronisiert',waitingNtp:'Wartet'
+ calibrated:'Kalibriert',notCalibrated:'Nicht kalibriert',active:'Aktiv',waiting:'Warte auf Messung',sensorDisconnected:'Sensor nicht erkannt',synchronized:'Synchronisiert',waitingNtp:'Wartet'
 },
 en:{
  sensor:'Sensor',systemSettings:'System settings',systemLog:'System log',factory:'Factory reset',
@@ -213,7 +213,7 @@ en:{
  checkUpdate:'Check for update',installUpdate:'Install update',updateChanges:'Changes in available firmware',manualUpdate:'Manual firmware update',uploadFirmware:'Upload firmware',
  resetText:'All saved settings including Wi-Fi and sensor calibration will be erased.',
  resetButton:'Restore factory settings',connected:'Connected',apMode:'AP mode',offline:'Offline',
- calibrated:'Calibrated',notCalibrated:'Not calibrated',active:'Active',waiting:'Waiting for measurement',synchronized:'Synchronized',waitingNtp:'Waiting'
+ calibrated:'Calibrated',notCalibrated:'Not calibrated',active:'Active',waiting:'Waiting for measurement',sensorDisconnected:'Sensor not detected',synchronized:'Synchronized',waitingNtp:'Waiting'
 }};
 function tr(k){return (T[lang]&&T[lang][k])||k}
 function applyI18n(){document.querySelectorAll('[data-i18n]').forEach(e=>e.textContent=tr(e.dataset.i18n))}
@@ -240,10 +240,14 @@ async function loadState(forceFormFill=false){
    if(connected)badge(connBadge,tr('connected'),'good');else if(ap)badge(connBadge,tr('apMode'),'warn');else badge(connBadge,tr('offline'),'bad');
    badge(sysBadge,connected?tr('connected'):(ap?tr('apMode'):tr('offline')),connected?'good':(ap?'warn':'bad'));
 
-   heroMoisture.textContent=S.sensor.valid?pct(S.sensor.moisture_percent):'-- %';
+   const sensorStateCode=S.sensor.status||'no_measurement';
+   heroMoisture.textContent=(S.sensor.valid&&S.sensor.plausible)?pct(S.sensor.moisture_percent):'-- %';
    heroSensor.textContent=S.settings.device_name||'--';
    heroCal.textContent=S.sensor.calibrated?tr('calibrated'):tr('notCalibrated');
-   badge(sensorBadge,S.sensor.valid?tr('active'):tr('waiting'),S.sensor.valid?'good':'warn');
+   if(sensorStateCode==='not_connected')badge(sensorBadge,tr('sensorDisconnected'),'bad');
+   else if(sensorStateCode==='not_calibrated')badge(sensorBadge,tr('notCalibrated'),'warn');
+   else if(sensorStateCode==='ok')badge(sensorBadge,tr('active'),'good');
+   else badge(sensorBadge,tr('waiting'),'warn');
 
    stRaw.textContent=S.sensor.valid?S.sensor.raw_adc:'--';
    stPin.textContent=S.settings.signal_pin||'A0';
@@ -261,7 +265,7 @@ async function loadState(forceFormFill=false){
    stVersion.textContent='v'+String(S.version||'').replace(/^v/,'');
    liveRaw.textContent=S.sensor.valid?S.sensor.raw_adc:'--';
    dryVal.textContent=S.settings.dry_adc;wetVal.textContent=S.settings.wet_adc;
-   calMoist.textContent=S.sensor.valid?pct(S.sensor.moisture_percent):'--';
+   calMoist.textContent=(S.sensor.valid&&S.sensor.plausible)?pct(S.sensor.moisture_percent):'--';
 
    if(forceFormFill || (!formDirty && !saveInProgress)){
      signalPin.value=S.settings.signal_pin||'A0';

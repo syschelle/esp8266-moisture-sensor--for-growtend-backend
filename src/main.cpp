@@ -16,6 +16,8 @@ static constexpr uint16_t CFG_SCHEMA = 1;
 static constexpr size_t EEPROM_SIZE = 1024;
 static constexpr uint16_t ADC_MAX_VALUE = 1023;
 static constexpr uint16_t MIN_CALIBRATION_SPAN = 40;
+static constexpr uint16_t SENSOR_ADC_DISCONNECTED_MAX = 50;
+static constexpr uint16_t SENSOR_ADC_PLAUSIBLE_MAX = 1000;
 static constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000;
 static constexpr uint32_t WIFI_RETRY_MS = 15000;
 static constexpr uint32_t WIFI_AP_AFTER_DISCONNECT_MS = 30000;
@@ -146,8 +148,8 @@ static void defaults() {
   copyText(cfg.deviceName, sizeof(cfg.deviceName), "SoilSensor-1");
   copyText(cfg.sensorName, sizeof(cfg.sensorName), "SoilSensor-1"); // legacy compatibility field
   copyText(cfg.signalPin, sizeof(cfg.signalPin), "A0");
-  cfg.dryAdc = 800;
-  cfg.wetAdc = 400;
+  cfg.dryAdc = 0;
+  cfg.wetAdc = 0;
   cfg.measureIntervalSeconds = 5;
   cfg.sampleCount = 10;
   copyText(cfg.ntpServer, sizeof(cfg.ntpServer), "de.pool.ntp.org");
@@ -166,7 +168,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.15: deviceName is the single authoritative identity.
+    // v0.1.16: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -238,8 +240,12 @@ static bool calibrated() {
   return abs((int)cfg.dryAdc - (int)cfg.wetAdc) >= MIN_CALIBRATION_SPAN;
 }
 
+static bool sensorAdcPlausible(float raw) {
+  return raw > (float)SENSOR_ADC_DISCONNECTED_MAX && raw <= (float)SENSOR_ADC_PLAUSIBLE_MAX;
+}
+
 static float moistureFromAdc(float adc) {
-  if (!calibrated()) return NAN;
+  if (!calibrated() || !sensorAdcPlausible(adc)) return NAN;
   const float span = (float)cfg.wetAdc - (float)cfg.dryAdc;
   float pct = ((adc - (float)cfg.dryAdc) / span) * 100.0f;
   if (pct < 0.0f) pct = 0.0f;
@@ -701,6 +707,8 @@ static void apiCurrentValues() {
   if (sensorState.valid && !isnan(sensorState.moisturePercent)) doc["moisture_percent"] = roundf(sensorState.moisturePercent * 10.0f) / 10.0f;
   else doc["moisture_percent"] = nullptr;
   doc["calibrated"] = calibrated();
+  doc["sensor_plausible"] = sensorState.valid && sensorAdcPlausible(sensorState.rawAdc);
+  doc["sensor_status"] = !sensorState.valid ? "no_measurement" : (!sensorAdcPlausible(sensorState.rawAdc) ? "not_connected" : (!calibrated() ? "not_calibrated" : "ok"));
   doc["last_measurement_at"] = sensorState.measurementEpoch ? localTimestamp(sensorState.measurementEpoch) : "";
   doc["wifi_rssi"] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0;
   doc["uptime_seconds"] = millis() / 1000UL;
@@ -709,10 +717,12 @@ static void apiCurrentValues() {
 
 static void apiHealth() {
   JsonDocument doc;
-  const bool healthy = sensorState.valid && calibrated();
+  const bool healthy = sensorState.valid && sensorAdcPlausible(sensorState.rawAdc) && calibrated();
   doc["status"] = healthy ? "ok" : "degraded";
   doc["sensor_valid"] = sensorState.valid;
   doc["calibrated"] = calibrated();
+  doc["sensor_plausible"] = sensorState.valid && sensorAdcPlausible(sensorState.rawAdc);
+  doc["sensor_status"] = !sensorState.valid ? "no_measurement" : (!sensorAdcPlausible(sensorState.rawAdc) ? "not_connected" : (!calibrated() ? "not_calibrated" : "ok"));
   doc["wifi_connected"] = WiFi.status() == WL_CONNECTED;
   doc["time_valid"] = timeValid();
   doc["uptime_seconds"] = millis() / 1000UL;
@@ -743,6 +753,8 @@ static void apiState() {
   JsonObject sensor = doc["sensor"].to<JsonObject>();
   sensor["valid"] = sensorState.valid;
   sensor["calibrated"] = calibrated();
+  sensor["plausible"] = sensorState.valid && sensorAdcPlausible(sensorState.rawAdc);
+  sensor["status"] = !sensorState.valid ? "no_measurement" : (!sensorAdcPlausible(sensorState.rawAdc) ? "not_connected" : (!calibrated() ? "not_calibrated" : "ok"));
   sensor["raw_adc"] = sensorState.valid ? sensorState.rawAdc : -1;
   if (sensorState.valid && !isnan(sensorState.moisturePercent)) sensor["moisture_percent"] = roundf(sensorState.moisturePercent * 10.0f) / 10.0f;
   else sensor["moisture_percent"] = nullptr;
@@ -814,6 +826,7 @@ static void saveSystemSettings() {
 
 static void calibratePoint(bool dry) {
   if (!sensorState.valid) return sendError(409, "No sensor measurement available");
+  if (!sensorAdcPlausible(sensorState.rawAdc)) return sendError(409, "Sensor value is implausible / sensor not connected");
   if (dry) cfg.dryAdc = sensorState.rawAdc;
   else cfg.wetAdc = sensorState.rawAdc;
   saveConfig();

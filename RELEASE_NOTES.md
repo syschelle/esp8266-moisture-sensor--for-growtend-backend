@@ -1,55 +1,35 @@
-# ESP8266 Moisture Sensor v0.1.15
+# ESP8266 Moisture Sensor v0.1.16
 
-This release adds OTA release-change information and merges the duplicate sensor/device naming.
+This release adds sensor plausibility detection so an ESP8266 without a connected moisture sensor is no longer reported as 100% soil moisture.
 
-## OTA release changes
+## Disconnected sensor detection
 
-When a newer firmware version is available, the OTA page now displays a new card below **Manual firmware update** containing the changes for that release.
+ADC values from `0` through `50` are now treated as an implausible / disconnected sensor signal.
 
-The GitHub Release asset `README.md` is now generated directly from `RELEASE_NOTES.md`.
+The upper plausibility limit is `1000`.
 
-The browser does not fetch GitHub directly. The ESP8266 provides the release text through:
+Examples observed during testing:
 
-`GET /api/ota/readme`
+- ADC `6` without sensor -> sensor not detected
+- ADC `9` without sensor -> sensor not detected
+- ADC `622` with a sensor hanging in dry air -> plausible measurement
 
-The card is only shown when a newer firmware version is available.
+If the ADC value is implausible:
 
-## Unified device name
+- soil moisture is shown as `--`
+- the sensor badge shows `Sensor nicht erkannt`
+- `moisture_percent` is `null`
+- `/api/health` is `degraded`
+- dry/wet calibration is blocked
 
-The separate sensor name and device name have been merged.
+## Factory calibration
 
-The device name is now the single identity used for:
+Fresh/factory-reset devices no longer use the old example calibration values `800 / 400`.
 
-- web interface header
-- browser tab
-- sensor label on the Status page
-- `/api/current-values` device field
-- `/api/current-values` sensor compatibility field
-- network hostname
+The defaults are now `0 / 0`, so a real dry/wet calibration is required before a valid percentage can be produced.
 
-The old `sensorName` EEPROM field remains only for configuration-layout compatibility and is automatically synchronized with the device name.
-
-## Hostname-safe naming
-
-Because the device name is also used as the network hostname, only the following characters are accepted:
-
-- `A-Z`
-- `a-z`
-- `0-9`
-- `-`
-
-Spaces and umlauts are rejected. A hyphen cannot be the first or last character.
-
-Valid example:
-
-`Topf-1`
-
-Invalid examples:
-
-`Topf 1`
-
-`Töpf-1`
+Existing saved calibration values are retained after a normal firmware update, but the new plausibility check still prevents ADC values up to 50 from producing a percentage.
 
 ## Version
 
-v0.1.15
+v0.1.16

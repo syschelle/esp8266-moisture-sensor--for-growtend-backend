@@ -1,37 +1,23 @@
-# ESP8266 Moisture Sensor v0.1.21
+# ESP8266 Moisture Sensor v0.1.22
 
-This release fixes manual firmware upload over Wi-Fi and removes an unnecessary delay from the normal OTA update check.
+This release changes the OTA page so the **Install update** button is only shown after the release notes have been loaded successfully.
 
-## Faster OTA update check
+## OTA install button behavior
 
-The OTA page previously caused two separate HTTPS requests through the ESP8266 when a newer version was available:
+When a newer firmware version is found, the page now follows this sequence:
 
-1. `manifest.json`
-2. release `README.md`
+1. detect the available firmware
+2. load and display the release notes
+3. enable and show **Install update**
 
-Because the ESP8266 web server is single-threaded, the second GitHub TLS request temporarily blocked the local web interface and made the update process feel slower.
+While the release notes are loading, the install button remains hidden and disabled.
 
-Release notes are now included directly in `manifest.json`, so version information, firmware metadata and release changes are obtained in one request.
+If the release notes cannot be loaded, the firmware is still reported as available, but the install button remains hidden.
 
-The existing `/api/ota/readme` endpoint remains as a compatibility fallback for older manifests, but the UI no longer waits for that second request.
+For current releases the notes are embedded directly in `manifest.json`, so no additional GitHub request is normally required.
 
-The actual firmware download, SHA-256 verification, flash write and normal reboot logic remain unchanged.
-
-## Manual firmware update over Wi-Fi
-
-Manual firmware upload is designed to work over the normal WLAN connection.
-
-The previous web UI called a non-existent JavaScript function named `uploadBuf()`. Therefore the manual upload could not work.
-
-The manual updater now:
-
-- uploads `firmware.bin` using `multipart/form-data`
-- sends it to `POST /api/ota/upload`
-- shows real upload progress
-- waits for the ESP8266 to reboot
-- reconnects to the device afterwards
-- logs manual OTA start, install, errors and reboot in the System log
+Older manifests still use `/api/ota/readme` as a compatibility fallback. In that fallback case the UI waits for the release text before offering installation.
 
 ## Version
 
-v0.1.21
+v0.1.22

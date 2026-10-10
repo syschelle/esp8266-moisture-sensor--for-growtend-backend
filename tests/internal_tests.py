@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.21", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.21", "0.1.21"))
+check("version newer patch", is_newer("0.1.22", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.22", "0.1.22"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -83,7 +83,7 @@ check("obsolete manual calibration constants absent", "SENSOR_ADC_MIN_PLAUSIBLE"
 check("manifest embeds release notes", '"release_notes": release_notes' in OTA_SCRIPT)
 check("OTA check returns embedded release notes", 'doc["release_notes"] = manifest.releaseNotes' in MAIN)
 check("OTA UI uses embedded release notes", "if(c.release_notes)" in UI and "otaReadme.textContent=c.release_notes" in UI)
-check("OTA check no longer awaits second README request", "await loadOtaReadme()" not in UI)
+check("OTA fallback is awaited only when release notes are absent", "releaseNotesReady=await loadOtaReadme()" in UI and "if(c.release_notes)" in UI)
 check("manual OTA uses multipart FormData", "const form=new FormData()" in UI and "form.append('firmware',f,f.name)" in UI)
 check("manual OTA has upload progress", "xhr.upload.onprogress" in UI)
 check("manual OTA posts to local endpoint", "xhr.open('POST','/api/ota/upload',true)" in UI)
@@ -134,6 +134,13 @@ check("OTA status keeps original hint markup", '<div class="hint" id="otaMsg"></
 check("OTA status text color override", "#otaMsg{color:var(--text)}" in UI)
 check("no custom OTA status box style", ".otaStatus{" not in UI)
 
+check("install button waits for release notes", "let releaseNotesReady=false" in UI and "if(releaseNotesReady)" in UI)
+check("install button hidden while release notes load", "otaInstallBtn.style.display='none'" in UI and "otaInstallBtn.disabled=true" in UI)
+check("embedded release notes unlock install button", "otaReadme.textContent=c.release_notes" in UI and "releaseNotesReady=true" in UI)
+check("fallback release notes awaited before install", "releaseNotesReady=await loadOtaReadme()" in UI)
+check("release note loader reports success", "return true;" in UI and "return false;" in UI)
+check("install button shown inside ready block", "if(releaseNotesReady)" in UI and "otaInstallBtn.style.display='inline-block'" in UI)
+
 # Release pipeline
 check("tag workflow", 'tags:' in WORKFLOW and '"v*"' in WORKFLOW)
 check("release asset upload", "gh release upload" in WORKFLOW)
@@ -144,7 +151,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.21", bool(m) and m.group(1) == "0.1.21")
+check("firmware version 0.1.22", bool(m) and m.group(1) == "0.1.22")
 
 if failures:
     print("\nInternal regression tests failed:")

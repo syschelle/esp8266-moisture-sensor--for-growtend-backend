@@ -335,27 +335,56 @@ async function loadOtaReadme(){
  try{
   let r=await fetch('/api/ota/readme',{cache:'no-store'}),text=await r.text();
   if(!r.ok)throw Error(text||('HTTP '+r.status));
-  otaReadme.textContent=text;otaReadmeCard.style.display='block';
+  otaReadme.textContent=text;
+  otaReadmeCard.style.display='block';
+  return true;
  }catch(e){
   otaReadme.textContent=lang==='de'?'Änderungen konnten nicht geladen werden: '+e.message:'Could not load changes: '+e.message;
   otaReadmeCard.style.display='block';
+  return false;
  }
 }
 async function checkOta(){
  try{
-  otaCheckBtn.disabled=true; otaInstallBtn.style.display='none'; otaReadmeCard.style.display='none'; otaReadme.textContent='--'; otaMsg.textContent=lang==='de'?'Prüfe Update…':'Checking update…'; otaProgress.style.width='0';
-  let c=await api('/api/ota/check'); otaAvailable.textContent='v'+String(c.available_version||'').replace(/^v/,''); otaExpectedVersion=String(c.available_version||'').replace(/^v/,'');
+  otaCheckBtn.disabled=true;
+  otaInstallBtn.style.display='none';
+  otaInstallBtn.disabled=true;
+  otaReadmeCard.style.display='none';
+  otaReadme.textContent='--';
+  otaMsg.textContent=lang==='de'?'Prüfe Update…':'Checking update…';
+  otaProgress.style.width='0';
+
+  let c=await api('/api/ota/check');
+  otaAvailable.textContent='v'+String(c.available_version||'').replace(/^v/,'');
+  otaExpectedVersion=String(c.available_version||'').replace(/^v/,'');
+
   if(c.update_available){
-   otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar.':'New firmware available.';
-   otaInstallBtn.style.display='inline-block';
+   otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar. Lade Änderungen…':'New firmware available. Loading changes…';
+
+   let releaseNotesReady=false;
    if(c.release_notes){
     otaReadme.textContent=c.release_notes;
     otaReadmeCard.style.display='block';
+    releaseNotesReady=true;
    }else{
-    loadOtaReadme();
+    releaseNotesReady=await loadOtaReadme();
    }
-  } else otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';
- }catch(e){ otaMsg.textContent=e.message; } finally { otaCheckBtn.disabled=false; }
+
+   if(releaseNotesReady){
+    otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar.':'New firmware available.';
+    otaInstallBtn.disabled=false;
+    otaInstallBtn.style.display='inline-block';
+   }else{
+    otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar, aber die Änderungen konnten nicht geladen werden.':'New firmware is available, but the release notes could not be loaded.';
+   }
+  }else{
+   otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';
+  }
+ }catch(e){
+  otaMsg.textContent=e.message;
+ }finally{
+  otaCheckBtn.disabled=false;
+ }
 }
 async function installOta(){
  try{

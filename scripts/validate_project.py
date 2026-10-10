@@ -14,8 +14,8 @@ ui = (root / "src" / "web_ui.h").read_text(encoding="utf-8")
 readme = (root / "README.md").read_text(encoding="utf-8")
 release = (root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
 
-require('#define APP_VERSION "0.1.25"' in version_h, "version header")
-require("v0.1.25" in readme and "v0.1.25" in release, "release version consistency")
+require('#define APP_VERSION "0.1.26"' in version_h, "version header")
+require("v0.1.26" in readme and "v0.1.26" in release, "release version consistency")
 require('"/api/current-values"' in main, "current-values API")
 require('"/api/health"' in main, "health API")
 require('pin != "A0"' in main, "A0 pin validation")
@@ -32,7 +32,7 @@ require("runs-on: ubuntu-24.04" in workflow, "fixed Ubuntu runner")
 require("pio run -e d1_mini" in workflow, "PlatformIO firmware build")
 require("python scripts/make_ota.py" in workflow, "OTA package creation")
 require("actions/upload-artifact@v4" in workflow, "firmware artifact upload")
-require("esp8266-moisture-sensor-v0.1.25" in workflow, "versioned firmware artifact name")
+require("esp8266-moisture-sensor-v0.1.26" in workflow, "versioned firmware artifact name")
 require("ota-dist/firmware.bin" in workflow, "firmware.bin artifact")
 require('tags:' in workflow and '"v*"' in workflow, "tag-triggered release workflow")
 require("permissions:" in workflow and "contents: write" in workflow, "release write permission")
@@ -65,7 +65,7 @@ require("setInterval(()=>{if(activePage==='status'" in ui, "safe periodic pollin
 version_h_text = (root / "include" / "version.h").read_text(encoding="utf-8")
 ota_script = (root / "scripts" / "make_ota.py").read_text(encoding="utf-8")
 require("https://github.com/syschelle/esp8266-moisture-sensor--for-growtend-backend/releases/latest/download/manifest.json" in version_h_text, "latest-release OTA manifest URL")
-require("releases/latest/download/firmware.bin" in ota_script, "latest-release firmware URL")
+require("releases/download/v{VERSION}/firmware.bin" in ota_script, "versioned firmware release URL")
 require("/ota/manifest.json" not in version_h_text, "no OTA branch manifest dependency")
 require("raw.githubusercontent.com/{REPO}/ota/firmware.bin" not in ota_script, "no OTA branch firmware dependency")
 
@@ -178,6 +178,13 @@ require('" | server=" + String(cfg.ntpServer)' in main, "NTP synchronized server
 require('" | TZ=" + String(cfg.timezone)' in main, "NTP synchronized timezone log")
 require('" | RSSI=" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0)' in main, "NTP synchronized RSSI log")
 require("return 24UL * 60UL * 60UL * 1000UL;" in main, "daily NTP interval retained")
+
+require("OTA NET: manifest redirect " in main and "HTTPC_DISABLE_FOLLOW_REDIRECTS" in main, "manual manifest redirect handling")
+require("manifest empty payload despite HTTP 200; retrying" in main, "manifest empty-body retry")
+require("manifest body length mismatch HTTP=" in main, "manifest body-length validation")
+require("MAX_MANIFEST_ATTEMPTS = 3" in main, "manifest retries")
+require("MAX_FIRMWARE_REDIRECTS = 6" in main and "OTA NET: firmware redirect " in main, "manual firmware redirect handling")
+require("releases/download/v{VERSION}/firmware.bin" in ota_script, "versioned firmware release URL")
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

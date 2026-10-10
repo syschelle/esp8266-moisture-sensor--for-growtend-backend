@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.25", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.25", "0.1.25"))
+check("version newer patch", is_newer("0.1.26", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.26", "0.1.26"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -116,6 +116,17 @@ check("NTP synchronization log contains timezone", '" | TZ=" + String(cfg.timezo
 check("NTP synchronization log contains RSSI", '" | RSSI=" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0)' in MAIN)
 check("daily NTP interval retained after logging change", "return 24UL * 60UL * 60UL * 1000UL;" in MAIN)
 
+check("manifest manual redirect handling", "HTTPC_DISABLE_FOLLOW_REDIRECTS" in MAIN and "OTA NET: manifest redirect " in MAIN)
+check("manifest redirect location header", 'const char* headerKeys[] = {"Location"};' in MAIN and "http.collectHeaders(headerKeys, 1);" in MAIN)
+check("manifest retry on empty HTTP 200 body", "manifest empty payload despite HTTP 200; retrying" in MAIN)
+check("manifest body length validation", "manifest body length mismatch HTTP=" in MAIN)
+check("manifest three attempts", "MAX_MANIFEST_ATTEMPTS = 3" in MAIN)
+check("manifest redirect limit", "MAX_REDIRECTS = 6" in MAIN)
+check("firmware manual redirect handling", "MAX_FIRMWARE_REDIRECTS = 6" in MAIN and "OTA NET: firmware redirect " in MAIN)
+check("redirect log includes location length", "locationLen=" in MAIN)
+check("versioned firmware URL removes latest redirect", "releases/download/v{VERSION}/firmware.bin" in OTA_SCRIPT)
+check("manual OTA remains unchanged", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
+
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
 check("OTA update endpoint", '"/api/ota/update"' in MAIN)
@@ -172,12 +183,12 @@ check("tag workflow", 'tags:' in WORKFLOW and '"v*"' in WORKFLOW)
 check("release asset upload", "gh release upload" in WORKFLOW)
 check("firmware release asset", "firmware.bin" in WORKFLOW)
 check("manifest release asset", "manifest.json" in WORKFLOW)
-check("latest-release firmware URL", "releases/latest/download/firmware.bin" in OTA_SCRIPT)
+check("versioned firmware release URL", "releases/download/v{VERSION}/firmware.bin" in OTA_SCRIPT)
 check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.25", bool(m) and m.group(1) == "0.1.25")
+check("firmware version 0.1.26", bool(m) and m.group(1) == "0.1.26")
 
 if failures:
     print("\nInternal regression tests failed:")

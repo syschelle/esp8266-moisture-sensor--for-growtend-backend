@@ -1,28 +1,58 @@
-# ESP8266 Moisture Sensor v0.1.25
+# ESP8266 Moisture Sensor v0.1.26
 
-This release adds detailed System Log entries after every successful NTP/SNTP time synchronization.
+This release hardens the Internet OTA path against GitHub Release redirect and empty-response problems observed in the System Log.
 
-## NTP synchronization logging
+## GitHub redirect handling
 
-The ESP8266 time-set callback is now monitored by the main loop.
+The previous implementation relied on `HTTPClient` automatic redirect following.
 
-After every successful NTP update, the System Log records:
+The observed failures included:
 
-- determined local date and time
-- configured NTP server
-- configured POSIX timezone
-- current Wi-Fi RSSI
+- final HTTP `302` responses instead of the release asset
+- HTTP `200` with the expected Content-Length but an empty manifest body
 
-Example:
+The firmware now follows GitHub redirects explicitly.
 
-`NTP: synchronized local=2026-10-10 18:55:03 | server=de.pool.ntp.org | TZ=CET-1CEST,M3.5.0,M10.5.0/3 | RSSI=-58 dBm`
+For each redirect it logs:
 
-This applies to the initial successful synchronization after boot as well as the automatic daily refresh.
+- redirect HTTP code
+- redirect hop number
+- Location header length
+- destination host
+- current free heap
 
-## Daily NTP interval
+The full signed GitHub asset URL is intentionally not written to the System Log.
 
-The existing 24-hour automatic SNTP refresh interval is unchanged.
+## Manifest retries
+
+Manifest retrieval now performs up to three attempts.
+
+A retry is triggered when:
+
+- a redirect is invalid or incomplete
+- HTTP returns an unexpected response
+- HTTP `200` contains an empty body
+- the received body length does not match Content-Length
+- JSON parsing fails
+
+## Firmware download redirects
+
+The firmware download uses the same explicit redirect strategy.
+
+The generated manifest now points to the version-specific release asset:
+
+`/releases/download/v<VERSION>/firmware.bin`
+
+instead of:
+
+`/releases/latest/download/firmware.bin`
+
+This removes one unnecessary redirect from the actual firmware download.
+
+## Manual OTA
+
+The manual Wi-Fi firmware upload is unchanged.
 
 ## Version
 
-v0.1.25
+v0.1.26

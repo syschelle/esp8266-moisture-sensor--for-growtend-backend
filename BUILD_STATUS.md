@@ -1,20 +1,22 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.25
+# Build / validation status — ESP8266 Moisture Sensor v0.1.26
 
 ## Completed in the artifact environment
 
 - static project validation: PASS
 - internal regression tests: PASS
-- ESP8266 time-set callback registered: PASS
-- callback defers logging to main loop: PASS
-- synchronized local date/time logging: PASS
-- NTP server logging: PASS
-- timezone logging: PASS
-- Wi-Fi RSSI logging: PASS
-- 24-hour SNTP refresh interval retained: PASS
+- manual manifest redirect handling: PASS
+- manifest Location-header handling: PASS
+- empty HTTP-200 manifest retry: PASS
+- Content-Length/body validation: PASS
+- three manifest attempts: PASS
+- manual firmware redirect handling: PASS
+- version-specific firmware release URL: PASS
+- manual OTA implementation retained: PASS
+- daily NTP synchronization logging retained: PASS
 - JavaScript syntax: PASS
 - ZIP packaging and SHA-256 generation: PASS
 
-## Local checks
+## Local / CI verification
 
 ```powershell
 python scripts/validate_project.py

@@ -244,7 +244,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.25: deviceName is the single authoritative identity.
+    // v0.1.26: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -603,6 +603,41 @@ static bool isNewerVersion(const String& candidate, const String& current) {
   return false;
 }
 
+static bool otaIsRedirectCode(int code) {
+  return code == HTTP_CODE_MOVED_PERMANENTLY ||
+         code == HTTP_CODE_FOUND ||
+         code == HTTP_CODE_SEE_OTHER ||
+         code == HTTP_CODE_TEMPORARY_REDIRECT ||
+         code == 308;
+}
+
+static String otaUrlOrigin(const String& url) {
+  const int scheme = url.indexOf("://");
+  if (scheme < 0) return "";
+  const int hostStart = scheme + 3;
+  const int slash = url.indexOf('/', hostStart);
+  if (slash < 0) return url;
+  return url.substring(0, slash);
+}
+
+static String otaUrlHostForLog(const String& url) {
+  const int scheme = url.indexOf("://");
+  if (scheme < 0) return "?";
+  const int hostStart = scheme + 3;
+  int end = url.indexOf('/', hostStart);
+  if (end < 0) end = url.length();
+  return url.substring(hostStart, end);
+}
+
+static String otaResolveRedirectUrl(const String& currentUrl, const String& location) {
+  if (location.startsWith("https://")) return location;
+  if (location.startsWith("/")) {
+    const String origin = otaUrlOrigin(currentUrl);
+    if (origin.length()) return origin + location;
+  }
+  return "";
+}
+
 static bool fetchOtaManifest(OtaManifest& out, String& error) {
   resetOtaDiagRuntime();
   addLog("OTA: checking latest release manifest");
@@ -615,71 +650,150 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
     return false;
   }
 
-  BearSSL::WiFiClientSecure client;
-  client.setInsecure();
-  client.setTimeout(15000);
+  static constexpr uint8_t MAX_MANIFEST_ATTEMPTS = 3;
+  static constexpr uint8_t MAX_REDIRECTS = 6;
+  const char* headerKeys[] = {"Location"};
 
-  HTTPClient http;
-  http.setTimeout(15000);
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  for (uint8_t attempt = 1; attempt <= MAX_MANIFEST_ATTEMPTS; ++attempt) {
+    String currentUrl = OTA_MANIFEST_URL;
+    String payload;
+    bool retry = false;
 
-  addLog("OTA NET: manifest HTTP begin");
-  if (!http.begin(client, OTA_MANIFEST_URL)) {
-    error = "Manifest connection failed";
-    addLog("OTA NET: manifest http.begin failed");
-    return false;
+    addLog("OTA NET: manifest attempt " + String(attempt) + "/" +
+           String(MAX_MANIFEST_ATTEMPTS));
+
+    for (uint8_t hop = 0; hop <= MAX_REDIRECTS; ++hop) {
+      BearSSL::WiFiClientSecure client;
+      client.setInsecure();
+      client.setTimeout(15000);
+
+      HTTPClient http;
+      http.setTimeout(15000);
+      http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+      http.collectHeaders(headerKeys, 1);
+      http.setReuse(false);
+
+      addLog("OTA NET: manifest GET hop " + String(hop) +
+             " host=" + otaUrlHostForLog(currentUrl) +
+             " heap=" + String(ESP.getFreeHeap()) + " B");
+
+      if (!http.begin(client, currentUrl)) {
+        error = "Manifest connection failed";
+        addLog("OTA NET: manifest http.begin failed");
+        retry = true;
+        break;
+      }
+
+      const uint32_t requestStarted = millis();
+      const int code = http.GET();
+      const uint32_t elapsedMs = (uint32_t)(millis() - requestStarted);
+      otaDiag.manifestMs += elapsedMs;
+      otaDiag.manifestHttpCode = (int16_t)code;
+
+      const int contentLength = http.getSize();
+      addLog("OTA NET: manifest HTTP " + String(code) + " after " +
+             String(elapsedMs) + " ms, length " + String(contentLength));
+
+      if (otaIsRedirectCode(code)) {
+        const String location = http.header("Location");
+        const String nextUrl = otaResolveRedirectUrl(currentUrl, location);
+
+        addLog("OTA NET: manifest redirect " + String(code) +
+               " hop=" + String(hop + 1) +
+               " locationLen=" + String(location.length()) +
+               " nextHost=" + otaUrlHostForLog(nextUrl));
+
+        http.end();
+        client.stop();
+
+        if (!nextUrl.length()) {
+          error = "Manifest redirect invalid";
+          addLog("OTA NET: manifest redirect missing/unsupported Location");
+          retry = true;
+          break;
+        }
+
+        currentUrl = nextUrl;
+        delay(20);
+        yield();
+        continue;
+      }
+
+      if (code != HTTP_CODE_OK) {
+        error = "Manifest HTTP " + String(code);
+        http.end();
+        client.stop();
+        retry = true;
+        break;
+      }
+
+      const uint32_t payloadStarted = millis();
+      payload = http.getString();
+      const uint32_t payloadMs = (uint32_t)(millis() - payloadStarted);
+      otaDiag.manifestBytes = payload.length();
+
+      http.end();
+      client.stop();
+
+      addLog("OTA NET: manifest payload " + String(otaDiag.manifestBytes) +
+             " B read in " + String(payloadMs) + " ms");
+
+      if (payload.length() == 0) {
+        error = "Manifest payload empty";
+        addLog("OTA NET: manifest empty payload despite HTTP 200; retrying");
+        retry = true;
+        break;
+      }
+
+      if (contentLength > 0 && payload.length() != (size_t)contentLength) {
+        error = "Manifest payload incomplete";
+        addLog("OTA NET: manifest body length mismatch HTTP=" +
+               String(contentLength) + " actual=" + String(payload.length()) +
+               "; retrying");
+        retry = true;
+        break;
+      }
+
+      JsonDocument doc;
+      DeserializationError jsonError = deserializeJson(doc, payload);
+      if (jsonError) {
+        error = "Manifest JSON invalid";
+        addLog("OTA NET: manifest JSON parse failed: " + String(jsonError.c_str()));
+        retry = true;
+        break;
+      }
+
+      out.version = String(doc["version"] | "");
+      out.url = String(doc["url"] | "");
+      out.sha256 = String(doc["sha256"] | "");
+      out.releaseNotes = String(doc["release_notes"] | "");
+      out.size = doc["size"] | 0;
+      out.sha256.toLowerCase();
+
+      addLog("OTA NET: release notes " + String(out.releaseNotes.length()) +
+             " B, firmware " + String(out.size) + " B");
+
+      if (!out.version.length() || !out.url.startsWith("https://") ||
+          out.sha256.length() != 64 || out.size < 1024) {
+        error = "Manifest fields invalid";
+        addLog("OTA: manifest invalid");
+        return false;
+      }
+
+      addLog("OTA: manifest OK, latest version " + out.version);
+      return true;
+    }
+
+    if (attempt < MAX_MANIFEST_ATTEMPTS) {
+      addLog("OTA NET: manifest retry in 500 ms: " + error);
+      delay(500);
+      yield();
+    } else if (retry) {
+      addLog("OTA NET: manifest attempts exhausted");
+    }
   }
 
-  const uint32_t requestStarted = millis();
-  int code = http.GET();
-  otaDiag.manifestMs = (uint32_t)(millis() - requestStarted);
-  otaDiag.manifestHttpCode = (int16_t)code;
-
-  const int contentLength = http.getSize();
-  addLog("OTA NET: manifest HTTP " + String(code) + " after " +
-         String(otaDiag.manifestMs) + " ms, length " + String(contentLength));
-
-  if (code != HTTP_CODE_OK) {
-    error = "Manifest HTTP " + String(code);
-    http.end();
-    return false;
-  }
-
-  const uint32_t payloadStarted = millis();
-  String payload = http.getString();
-  const uint32_t payloadMs = (uint32_t)(millis() - payloadStarted);
-  otaDiag.manifestBytes = payload.length();
-  http.end();
-
-  addLog("OTA NET: manifest payload " + String(otaDiag.manifestBytes) +
-         " B read in " + String(payloadMs) + " ms");
-
-  JsonDocument doc;
-  DeserializationError jsonError = deserializeJson(doc, payload);
-  if (jsonError) {
-    error = "Manifest JSON invalid";
-    addLog("OTA NET: manifest JSON parse failed");
-    return false;
-  }
-
-  out.version = String(doc["version"] | "");
-  out.url = String(doc["url"] | "");
-  out.sha256 = String(doc["sha256"] | "");
-  out.releaseNotes = String(doc["release_notes"] | "");
-  out.size = doc["size"] | 0;
-  out.sha256.toLowerCase();
-
-  addLog("OTA NET: release notes " + String(out.releaseNotes.length()) +
-         " B, firmware " + String(out.size) + " B");
-
-  if (!out.version.length() || !out.url.startsWith("https://") || out.sha256.length() != 64 || out.size < 1024) {
-    error = "Manifest fields invalid";
-    addLog("OTA: manifest invalid");
-    return false;
-  }
-
-  addLog("OTA: manifest OK, latest version " + out.version);
-  return true;
+  return false;
 }
 
 static bool downloadAndFlashOta(const OtaManifest& manifest, String& error) {
@@ -715,28 +829,81 @@ static bool downloadAndFlashOta(const OtaManifest& manifest, String& error) {
 
   HTTPClient http;
   http.setTimeout(20000);
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  http.setReuse(false);
+  const char* firmwareHeaderKeys[] = {"Location"};
+  http.collectHeaders(firmwareHeaderKeys, 1);
 
-  addLog("OTA NET: firmware HTTP begin");
-  if (!http.begin(client, manifest.url)) {
-    error = "Firmware connection failed";
-    addLog("OTA NET: firmware http.begin failed");
-    saveOtaRecord(5, manifest.version, error);
-    return false;
+  static constexpr uint8_t MAX_FIRMWARE_REDIRECTS = 6;
+  String currentFirmwareUrl = manifest.url;
+  int code = 0;
+  int contentLength = -1;
+  bool firmwareResponseReady = false;
+
+  for (uint8_t hop = 0; hop <= MAX_FIRMWARE_REDIRECTS; ++hop) {
+    addLog("OTA NET: firmware GET hop " + String(hop) +
+           " host=" + otaUrlHostForLog(currentFirmwareUrl) +
+           " heap=" + String(ESP.getFreeHeap()) + " B");
+
+    if (!http.begin(client, currentFirmwareUrl)) {
+      error = "Firmware connection failed";
+      addLog("OTA NET: firmware http.begin failed");
+      saveOtaRecord(5, manifest.version, error);
+      return false;
+    }
+
+    const uint32_t headerStarted = millis();
+    code = http.GET();
+    const uint32_t headerElapsed = (uint32_t)(millis() - headerStarted);
+    otaDiag.firmwareHeaderMs += headerElapsed;
+    otaDiag.firmwareHttpCode = (int16_t)code;
+    contentLength = http.getSize();
+
+    addLog("OTA NET: firmware HTTP " + String(code) + " after " +
+           String(headerElapsed) + " ms, length " + String(contentLength));
+
+    if (otaIsRedirectCode(code)) {
+      const String location = http.header("Location");
+      const String nextUrl = otaResolveRedirectUrl(currentFirmwareUrl, location);
+
+      addLog("OTA NET: firmware redirect " + String(code) +
+             " hop=" + String(hop + 1) +
+             " locationLen=" + String(location.length()) +
+             " nextHost=" + otaUrlHostForLog(nextUrl));
+
+      http.end();
+      client.stop();
+
+      if (!nextUrl.length()) {
+        error = "Firmware redirect invalid";
+        addLog("OTA NET: firmware redirect missing/unsupported Location");
+        saveOtaRecord(5, manifest.version, error);
+        return false;
+      }
+
+      currentFirmwareUrl = nextUrl;
+      delay(20);
+      yield();
+      continue;
+    }
+
+    if (code != HTTP_CODE_OK) {
+      error = "Firmware HTTP " + String(code);
+      http.end();
+      client.stop();
+      saveOtaRecord(5, manifest.version, error);
+      return false;
+    }
+
+    firmwareResponseReady = true;
+    break;
   }
 
-  const uint32_t headerStarted = millis();
-  int code = http.GET();
-  otaDiag.firmwareHeaderMs = (uint32_t)(millis() - headerStarted);
-  otaDiag.firmwareHttpCode = (int16_t)code;
-
-  int contentLength = http.getSize();
-  addLog("OTA NET: firmware HTTP " + String(code) + " after " +
-         String(otaDiag.firmwareHeaderMs) + " ms, length " + String(contentLength));
-
-  if (code != HTTP_CODE_OK) {
-    error = "Firmware HTTP " + String(code);
+  if (!firmwareResponseReady) {
+    error = "Firmware redirect limit exceeded";
+    addLog("OTA NET: firmware redirect limit exceeded");
     http.end();
+    client.stop();
     saveOtaRecord(5, manifest.version, error);
     return false;
   }

@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.28", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.28", "0.1.28"))
+check("version newer patch", is_newer("0.1.29", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.29", "0.1.29"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -197,6 +197,13 @@ check("release notes awaited before install", "const releaseNotesReady=await loa
 check("release note loader reports success", "return true;" in UI and "return false;" in UI)
 check("install button shown inside ready block", "if(releaseNotesReady)" in UI and "otaInstallBtn.style.display='inline-block'" in UI)
 
+check("System log clipboard button", 'onclick="copyLog()"' in UI and 'data-i18n="copyLog"' in UI)
+check("System log clipboard modern API", "navigator.clipboard" in UI and "navigator.clipboard.writeText(text)" in UI)
+check("System log clipboard HTTP fallback", "document.execCommand('copy')" in UI and "document.createElement('textarea')" in UI)
+check("System log clipboard German label", "copyLog:'In Zwischenablage kopieren'" in UI)
+check("System log clipboard English label", "copyLog:'Copy to clipboard'" in UI)
+check("System log clipboard result state", 'id="logCopyState"' in UI and "copiedLog" in UI and "copyLogFailed" in UI)
+
 # Release pipeline
 check("tag workflow", 'tags:' in WORKFLOW and '"v*"' in WORKFLOW)
 check("release asset upload", "gh release upload" in WORKFLOW)
@@ -207,7 +214,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.28", bool(m) and m.group(1) == "0.1.28")
+check("firmware version 0.1.29", bool(m) and m.group(1) == "0.1.29")
 
 if failures:
     print("\nInternal regression tests failed:")

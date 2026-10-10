@@ -14,8 +14,8 @@ ui = (root / "src" / "web_ui.h").read_text(encoding="utf-8")
 readme = (root / "README.md").read_text(encoding="utf-8")
 release = (root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
 
-require('#define APP_VERSION "0.1.28"' in version_h, "version header")
-require("v0.1.28" in readme and "v0.1.28" in release, "release version consistency")
+require('#define APP_VERSION "0.1.29"' in version_h, "version header")
+require("v0.1.29" in readme and "v0.1.29" in release, "release version consistency")
 require('"/api/current-values"' in main, "current-values API")
 require('"/api/health"' in main, "health API")
 require('pin != "A0"' in main, "A0 pin validation")
@@ -32,7 +32,7 @@ require("runs-on: ubuntu-24.04" in workflow, "fixed Ubuntu runner")
 require("pio run -e d1_mini" in workflow, "PlatformIO firmware build")
 require("python scripts/make_ota.py" in workflow, "OTA package creation")
 require("actions/upload-artifact@v4" in workflow, "firmware artifact upload")
-require("esp8266-moisture-sensor-v0.1.28" in workflow, "versioned firmware artifact name")
+require("esp8266-moisture-sensor-v0.1.29" in workflow, "versioned firmware artifact name")
 require("ota-dist/firmware.bin" in workflow, "firmware.bin artifact")
 require('tags:' in workflow and '"v*"' in workflow, "tag-triggered release workflow")
 require("permissions:" in workflow and "contents: write" in workflow, "release write permission")
@@ -200,6 +200,11 @@ require('"release_notes": release_notes' not in ota_script, "release notes remov
 require('(OUT / "README.md").write_text(release_notes' in ota_script, "separate README release asset retained")
 require("const releaseNotesReady=await loadOtaReadme()" in ui, "separate release notes loaded before install")
 require("OTA README: HTTP " in main and "OTA README: received " in main, "README fetch diagnostics")
+
+require('onclick="copyLog()"' in ui and 'data-i18n="copyLog"' in ui, "System log clipboard button")
+require("navigator.clipboard.writeText(text)" in ui, "clipboard API support")
+require("document.execCommand('copy')" in ui, "clipboard HTTP fallback")
+require('id="logCopyState"' in ui, "clipboard result state")
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

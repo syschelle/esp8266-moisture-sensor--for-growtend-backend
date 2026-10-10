@@ -150,7 +150,14 @@ pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:
 
 <section class="page" id="log">
   <div class="headrow"><div><h1 data-i18n="systemLog">Systemprotokoll</h1></div></div>
-  <div class="card"><button class="action secondary" onclick="loadLog()" data-i18n="refresh">Aktualisieren</button><pre id="logText">...</pre></div>
+  <div class="card">
+    <div class="actions">
+      <button class="action secondary" onclick="loadLog()" data-i18n="refresh">Aktualisieren</button>
+      <button class="action secondary" onclick="copyLog()" data-i18n="copyLog">In Zwischenablage kopieren</button>
+    </div>
+    <div id="logCopyState" class="saveState"></div>
+    <pre id="logText">...</pre>
+  </div>
 </section>
 
 <section class="page" id="ota">
@@ -200,7 +207,7 @@ de:{
  takeWet:'Aktuellen Wert als NASS speichern',calHint:'Trocken und nass müssen ausreichend unterschiedliche ADC-Werte liefern.',manualCalibration:'Kalibrierwerte manuell anpassen',manualDry:'Trockenwert manuell',manualWet:'Nasswert manuell',manualCalHint:'Zulässig sind ADC-Werte von 51 bis 1000. Trocken- und Nasswert müssen mindestens 40 Punkte auseinanderliegen.',saveCalibration:'Kalibrierwerte speichern',
  systemSub:'WLAN, Gerätename, NTP und Oberfläche konfigurieren.',deviceName:'Gerätename',deviceNameHint:'Wird auch als Netzwerk-Hostname verwendet. Nur A-Z, a-z, 0-9 und Bindestrich; keine Leerzeichen oder Umlaute.',wifiPassword:'Wi-Fi Passwort',
  passwordHint:'Leer lassen, um das gespeicherte Passwort beizubehalten.',timezone:'Zeitzone (POSIX TZ)',language:'Sprache',
- reboot:'Neustart',refresh:'Aktualisieren',otaSub:'Firmware aktualisieren.',installed:'Installiert',available:'Verfügbar',
+ reboot:'Neustart',refresh:'Aktualisieren',copyLog:'In Zwischenablage kopieren',copiedLog:'Systemprotokoll kopiert.',copyLogFailed:'Kopieren nicht möglich.',otaSub:'Firmware aktualisieren.',installed:'Installiert',available:'Verfügbar',
  checkUpdate:'Update prüfen',installUpdate:'Update installieren',updateChanges:'Änderungen der verfügbaren Firmware',manualUpdate:'Manuelles Firmware-Update',uploadFirmware:'Firmware hochladen',
  resetText:'Alle gespeicherten Einstellungen einschließlich WLAN und Sensorkalibrierung werden gelöscht.',
  resetButton:'Werkseinstellungen laden',connected:'Verbunden',apMode:'AP-Modus',offline:'Nicht erreichbar',
@@ -218,7 +225,7 @@ en:{
  takeWet:'Store current value as WET',calHint:'Dry and wet must provide sufficiently different ADC values.',manualCalibration:'Adjust calibration values manually',manualDry:'Manual dry value',manualWet:'Manual wet value',manualCalHint:'Allowed ADC range is 51 to 1000. Dry and wet values must differ by at least 40 points.',saveCalibration:'Save calibration values',
  systemSub:'Configure Wi-Fi, device name, NTP and user interface.',deviceName:'Device name',deviceNameHint:'Also used as the network hostname. Use only A-Z, a-z, 0-9 and hyphen; no spaces or umlauts.',wifiPassword:'Wi-Fi password',
  passwordHint:'Leave empty to keep the stored password.',timezone:'Timezone (POSIX TZ)',language:'Language',
- reboot:'Reboot',refresh:'Refresh',otaSub:'Update firmware.',installed:'Installed',available:'Available',
+ reboot:'Reboot',refresh:'Refresh',copyLog:'Copy to clipboard',copiedLog:'System log copied.',copyLogFailed:'Could not copy log.',otaSub:'Update firmware.',installed:'Installed',available:'Available',
  checkUpdate:'Check for update',installUpdate:'Install update',updateChanges:'Changes in available firmware',manualUpdate:'Manual firmware update',uploadFirmware:'Upload firmware',
  resetText:'All saved settings including Wi-Fi and sensor calibration will be erased.',
  resetButton:'Restore factory settings',connected:'Connected',apMode:'AP mode',offline:'Offline',
@@ -327,6 +334,34 @@ async function saveManualCalibration(){
 
 async function calibrate(which){try{await postForm('/api/calibration/'+which,{});await loadState()}catch(e){alert(e.message)}}
 async function loadLog(){try{let r=await fetch('/api/log');logText.textContent=await r.text()}catch(e){logText.textContent=e.message}}
+
+async function copyLog(){
+ const text=logText.textContent||'';
+ logCopyState.textContent='';
+ if(!text.length)return;
+
+ try{
+  if(navigator.clipboard&&window.isSecureContext){
+   await navigator.clipboard.writeText(text);
+  }else{
+   const ta=document.createElement('textarea');
+   ta.value=text;
+   ta.setAttribute('readonly','');
+   ta.style.position='fixed';
+   ta.style.left='-9999px';
+   ta.style.top='0';
+   document.body.appendChild(ta);
+   ta.focus();
+   ta.select();
+   const ok=document.execCommand('copy');
+   document.body.removeChild(ta);
+   if(!ok)throw Error('copy failed');
+  }
+  logCopyState.textContent=T[lang].copiedLog;
+ }catch(e){
+  logCopyState.textContent=T[lang].copyLogFailed;
+ }
+}
 async function reboot(){if(confirm('Reboot?')){await postForm('/api/reboot',{})}}
 async function factoryReset(){if(confirm(lang==='de'?'Wirklich alle Einstellungen löschen?':'Really erase all settings?')){await postForm('/api/factory-reset',{})}}
 let otaExpectedVersion='';

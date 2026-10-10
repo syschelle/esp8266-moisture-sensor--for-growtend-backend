@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, json, shutil, sys
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.28"
+VERSION = "0.1.29"
 REPO = "syschelle/esp8266-moisture-sensor--for-growtend-backend"
 BIN = ROOT / ".pio" / "build" / "d1_mini" / "firmware.bin"
 OUT = ROOT / "ota-dist"

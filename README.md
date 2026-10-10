@@ -2,7 +2,7 @@
 
 This ESP8266-based sensor reads one capacitive analog soil-moisture sensor and exposes the current moisture value via HTTP for direct integration with the `syschelle/growtent-backend` project.
 
-**Current version: v0.1.28**
+**Current version: v0.1.29**
 
 ## Scope
 
@@ -35,7 +35,7 @@ Verify the accepted ADC input voltage for the exact ESP8266 board before connect
 
 The signal pin is configurable in the web interface.
 
-On ESP8266 v0.1.28 the supported analog input is:
+On ESP8266 v0.1.29 the supported analog input is:
 
 `A0`
 
@@ -102,7 +102,7 @@ Example:
   "device": "SoilSensor-1",
   "sensor": "Topf 1",
   "signal_pin": "A0",
-  "firmware_version": "0.1.28",
+  "firmware_version": "0.1.29",
   "raw_adc": 487,
   "moisture_percent": 63.4,
   "calibrated": true,
@@ -299,3 +299,8 @@ Failed body reads retry the already-resolved GitHub release asset URL where poss
 The OTA manifest contains firmware metadata only. Release notes are delivered separately through the release `README.md` asset.
 
 The ESP8266 reads the compact manifest into a fixed-size buffer instead of allocating a large dynamic String, reducing heap-fragmentation sensitivity during TLS and GitHub redirect processing.
+
+
+### Copy System Log
+
+The System Log page includes a **Copy to clipboard** button. The complete currently displayed log can be copied directly for diagnostics and support. A fallback is included for browsers opening the ESP8266 interface over local HTTP.

@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.18", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.18", "0.1.18"))
+check("version newer patch", is_newer("0.1.19", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.19", "0.1.19"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -120,6 +120,10 @@ check("OTA README card", 'id="otaReadmeCard"' in UI)
 check("OTA README loaded only for update", "await loadOtaReadme()" in UI)
 check("OTA README asset contains release notes", 'release_notes = (ROOT / "RELEASE_NOTES.md").read_text' in OTA_SCRIPT)
 
+check("OTA status uses readable style", 'class="otaStatus" id="otaMsg"' in UI)
+check("OTA status is not muted hint", '<div class="hint" id="otaMsg">' not in UI)
+check("OTA status has emphasis", ".otaStatus{" in UI and "font-weight:600" in UI)
+
 # Release pipeline
 check("tag workflow", 'tags:' in WORKFLOW and '"v*"' in WORKFLOW)
 check("release asset upload", "gh release upload" in WORKFLOW)
@@ -130,7 +134,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.18", bool(m) and m.group(1) == "0.1.18")
+check("firmware version 0.1.19", bool(m) and m.group(1) == "0.1.19")
 
 if failures:
     print("\nInternal regression tests failed:")

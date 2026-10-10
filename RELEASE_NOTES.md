@@ -1,30 +1,25 @@
-# ESP8266 Moisture Sensor v0.1.18
+# ESP8266 Moisture Sensor v0.1.19
 
-This release fixes the GitHub / PlatformIO build failure introduced with the manual calibration feature.
+This release improves the readability of the OTA status message.
 
-## Build fix
+## OTA status readability
 
-The manual calibration handler in v0.1.17 referenced non-existent constant names:
+The message below the OTA progress bar, for example:
 
-- `SENSOR_ADC_MIN_PLAUSIBLE`
-- `SENSOR_ADC_MAX_PLAUSIBLE`
+`Keine neuere Version verfügbar.`
 
-The existing firmware constants are:
+previously used the generic muted hint style. On the white card background this resulted in low contrast.
 
-- `SENSOR_ADC_DISCONNECTED_MAX`
-- `SENSOR_ADC_PLAUSIBLE_MAX`
+The OTA status message now uses a dedicated style with:
 
-The manual calibration validation now uses the existing canonical constants. ADC values up to and including `50` are treated as disconnected, so manual calibration values must be `51..1000`.
+- normal foreground text color
+- stronger font weight
+- subtle border
+- separate background area
+- improved padding and line height
 
-No behavior changes are made to the manual calibration limits.
-
-## Tests
-
-The regression suite now explicitly verifies that:
-
-- manual calibration uses the canonical ADC plausibility constants
-- the obsolete constant names cannot be reintroduced
+This applies to update checks, download/install status, reboot status and errors.
 
 ## Version
 
-v0.1.18
+v0.1.19

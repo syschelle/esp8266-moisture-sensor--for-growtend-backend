@@ -42,6 +42,7 @@ button.action{border:0;border-radius:7px;padding:10px 14px;background:var(--prim
 button.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}button.danger{background:var(--bad)}
 .hint{color:var(--muted);font-size:12px;margin-top:7px}.saveState{font-size:12px;margin-top:10px;color:var(--muted)}
 .releaseReadme{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;color:var(--text);font-size:14px}
+.otaStatus{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;font-weight:600;line-height:1.4}
 pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:7px;overflow:auto;max-height:520px;white-space:pre-wrap}
 .progress{height:9px;background:var(--line);border-radius:999px;overflow:hidden;margin-top:15px}.progress span{display:block;height:100%;width:0;background:var(--primary)}
 @media(max-width:850px){.sidebar{width:175px}.content{margin-left:175px;padding:75px 18px 26px}.grid2{grid-template-columns:1fr}}
@@ -162,7 +163,7 @@ pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:
       <button id="otaInstallBtn" class="action" onclick="installOta()" style="display:none" data-i18n="installUpdate">Update installieren</button>
     </div>
     <div class="progress"><span id="otaProgress"></span></div>
-    <div class="hint" id="otaMsg"></div>
+    <div class="otaStatus" id="otaMsg"></div>
   </div>
   <div class="card" style="margin-top:14px">
     <h2 data-i18n="manualUpdate">Manuelles Firmware-Update</h2>

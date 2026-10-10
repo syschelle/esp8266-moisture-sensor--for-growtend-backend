@@ -168,7 +168,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.18: deviceName is the single authoritative identity.
+    // v0.1.19: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);

@@ -1,58 +1,62 @@
-# ESP8266 Moisture Sensor v0.1.26
+# ESP8266 Moisture Sensor v0.1.27
 
-This release hardens the Internet OTA path against GitHub Release redirect and empty-response problems observed in the System Log.
+This release fixes the next Internet OTA failure identified by the v0.1.26 diagnostics.
 
-## GitHub redirect handling
+## Root cause identified
 
-The previous implementation relied on `HTTPClient` automatic redirect following.
+The GitHub redirect chain itself now completes successfully.
 
-The observed failures included:
+The System Log showed the final release asset returning:
 
-- final HTTP `302` responses instead of the release asset
-- HTTP `200` with the expected Content-Length but an empty manifest body
+- HTTP `200`
+- valid `Content-Length`
+- but `HTTPClient::getString()` returned an empty payload
 
-The firmware now follows GitHub redirects explicitly.
+Example from the field log:
 
-For each redirect it logs:
+`manifest HTTP 200 ... length 1771`
 
-- redirect HTTP code
-- redirect hop number
-- Location header length
-- destination host
-- current free heap
+followed by:
 
-The full signed GitHub asset URL is intentionally not written to the System Log.
+`manifest payload 0 B`
 
-## Manifest retries
+The manifest JSON was therefore never received by the parser.
 
-Manifest retrieval now performs up to three attempts.
+## Streamed manifest body reader
 
-A retry is triggered when:
+The manifest is no longer read with `HTTPClient::getString()`.
 
-- a redirect is invalid or incomplete
-- HTTP returns an unexpected response
-- HTTP `200` contains an empty body
-- the received body length does not match Content-Length
-- JSON parsing fails
+The firmware now reads the response body directly from the HTTP stream until the expected `Content-Length` has been received.
 
-## Firmware download redirects
+This body reader does not stop merely because the remote HTTP connection has already been marked as closed. That is important for GitHub release assets, where the server may close the connection immediately after sending the response.
 
-The firmware download uses the same explicit redirect strategy.
+The manifest body reader:
 
-The generated manifest now points to the version-specific release asset:
+- waits for the expected number of bytes
+- logs current body progress while waiting
+- uses a 3-second idle timeout
+- validates the final body length
+- requests identity encoding
+- retries on an empty or incomplete body
 
-`/releases/download/v<VERSION>/firmware.bin`
+## Faster retries
 
-instead of:
+After GitHub has already redirected the manifest request to the final release-assets host, a failed body read now retries that resolved URL directly instead of repeating the complete GitHub redirect chain.
 
-`/releases/latest/download/firmware.bin`
+The retry log shows the host that will be retried.
 
-This removes one unnecessary redirect from the actual firmware download.
+## Firmware download robustness
+
+The firmware download loop had the same dependency on `http.connected()`.
+
+It now continues reading until the complete expected firmware size has arrived or the existing data timeout is reached.
+
+SHA-256 verification and flash handling are unchanged.
 
 ## Manual OTA
 
-The manual Wi-Fi firmware upload is unchanged.
+The working manual Wi-Fi firmware upload remains unchanged.
 
 ## Version
 
-v0.1.26
+v0.1.27

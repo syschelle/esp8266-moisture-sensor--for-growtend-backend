@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.26", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.26", "0.1.26"))
+check("version newer patch", is_newer("0.1.27", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.27", "0.1.27"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -118,7 +118,7 @@ check("daily NTP interval retained after logging change", "return 24UL * 60UL * 
 
 check("manifest manual redirect handling", "HTTPC_DISABLE_FOLLOW_REDIRECTS" in MAIN and "OTA NET: manifest redirect " in MAIN)
 check("manifest redirect location header", 'const char* headerKeys[] = {"Location"};' in MAIN and "http.collectHeaders(headerKeys, 1);" in MAIN)
-check("manifest retry on empty HTTP 200 body", "manifest empty payload despite HTTP 200; retrying" in MAIN)
+check("manifest stream reader rejects empty HTTP 200 body", "manifest body reader returned 0 B" in MAIN or "Manifest payload empty" in MAIN)
 check("manifest body length validation", "manifest body length mismatch HTTP=" in MAIN)
 check("manifest three attempts", "MAX_MANIFEST_ATTEMPTS = 3" in MAIN)
 check("manifest redirect limit", "MAX_REDIRECTS = 6" in MAIN)
@@ -126,6 +126,16 @@ check("firmware manual redirect handling", "MAX_FIRMWARE_REDIRECTS = 6" in MAIN 
 check("redirect log includes location length", "locationLen=" in MAIN)
 check("versioned firmware URL removes latest redirect", "releases/download/v{VERSION}/firmware.bin" in OTA_SCRIPT)
 check("manual OTA remains unchanged", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
+
+check("manifest uses streaming body reader", "static bool otaReadTextBody(" in MAIN and "otaReadTextBody(" in MAIN)
+check("manifest no longer uses getString", "payload = http.getString();" not in MAIN)
+check("manifest waits for expected body despite disconnected socket", "while (contentLength <= 0 || total < (size_t)contentLength)" in MAIN)
+check("manifest body idle timeout", "MANIFEST_BODY_IDLE_TIMEOUT_MS = 3000" in MAIN)
+check("manifest retry reuses resolved URL", "String currentUrl = OTA_MANIFEST_URL;" in MAIN and "retryHost=" in MAIN)
+check("manifest requests identity encoding", 'http.addHeader("Accept-Encoding", "identity");' in MAIN)
+check("firmware download not gated by http connected state", "while (total < manifest.size)" in MAIN and "while (http.connected() && total < manifest.size)" not in MAIN)
+check("manual OTA still retained", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
+check("NTP sync logging still retained", "NTP: synchronized local=" in MAIN)
 
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
@@ -188,7 +198,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.26", bool(m) and m.group(1) == "0.1.26")
+check("firmware version 0.1.27", bool(m) and m.group(1) == "0.1.27")
 
 if failures:
     print("\nInternal regression tests failed:")

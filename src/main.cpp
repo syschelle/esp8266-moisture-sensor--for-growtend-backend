@@ -244,7 +244,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.26: deviceName is the single authoritative identity.
+    // v0.1.27: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -638,6 +638,98 @@ static String otaResolveRedirectUrl(const String& currentUrl, const String& loca
   return "";
 }
 
+static bool otaReadTextBody(HTTPClient& http, String& payload, int contentLength,
+                                uint32_t idleTimeoutMs, String& error) {
+  payload = "";
+
+  if (contentLength > 0) {
+    if (!payload.reserve((unsigned int)contentLength + 1U)) {
+      error = "Manifest memory reserve failed";
+      addLog("OTA NET: manifest String reserve failed for " + String(contentLength + 1) + " B");
+      return false;
+    }
+  }
+
+  WiFiClient* stream = http.getStreamPtr();
+  if (!stream) {
+    error = "Manifest stream unavailable";
+    addLog("OTA NET: manifest stream pointer is null");
+    return false;
+  }
+
+  uint8_t buffer[256];
+  size_t total = 0;
+  uint32_t lastDataMs = millis();
+  uint32_t lastWaitLogMs = 0;
+
+  addLog("OTA NET: manifest body reader start, available=" +
+         String(stream->available()) + ", connected=" +
+         String(stream->connected() ? 1 : 0));
+
+  while (contentLength <= 0 || total < (size_t)contentLength) {
+    int available = stream->available();
+
+    if (available > 0) {
+      size_t want = (size_t)available;
+      if (want > sizeof(buffer)) want = sizeof(buffer);
+
+      int got = stream->read(buffer, want);
+      if (got > 0) {
+        if (!payload.concat(reinterpret_cast<const char*>(buffer), (unsigned int)got)) {
+          error = "Manifest memory append failed";
+          addLog("OTA NET: manifest String append failed after " + String(total) + " B");
+          return false;
+        }
+
+        total += (size_t)got;
+        lastDataMs = millis();
+
+        if (contentLength > 0 && total >= (size_t)contentLength) break;
+        continue;
+      }
+    }
+
+    if (contentLength <= 0 && !stream->connected() && stream->available() == 0) {
+      break;
+    }
+
+    const uint32_t idleMs = (uint32_t)(millis() - lastDataMs);
+    if (idleMs >= 1000UL && idleMs - lastWaitLogMs >= 1000UL) {
+      lastWaitLogMs = idleMs;
+      addLog("OTA NET: waiting for manifest body " + String(idleMs) +
+             " ms, received " + String(total) + "/" +
+             String(contentLength) + " B, connected=" +
+             String(stream->connected() ? 1 : 0));
+    }
+
+    if (idleMs >= idleTimeoutMs) {
+      error = total == 0 ? "Manifest payload empty" : "Manifest payload incomplete";
+      addLog("OTA NET: manifest body timeout after " + String(idleMs) +
+             " ms, received " + String(total) + "/" +
+             String(contentLength) + " B");
+      return false;
+    }
+
+    delay(1);
+    yield();
+  }
+
+  if (contentLength > 0 && total != (size_t)contentLength) {
+    error = "Manifest payload incomplete";
+    addLog("OTA NET: manifest body length mismatch HTTP=" +
+           String(contentLength) + " actual=" + String(total));
+    return false;
+  }
+
+  if (total == 0) {
+    error = "Manifest payload empty";
+    addLog("OTA NET: manifest body reader returned 0 B");
+    return false;
+  }
+
+  return true;
+}
+
 static bool fetchOtaManifest(OtaManifest& out, String& error) {
   resetOtaDiagRuntime();
   addLog("OTA: checking latest release manifest");
@@ -652,10 +744,15 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
 
   static constexpr uint8_t MAX_MANIFEST_ATTEMPTS = 3;
   static constexpr uint8_t MAX_REDIRECTS = 6;
+  static constexpr uint32_t MANIFEST_BODY_IDLE_TIMEOUT_MS = 3000;
   const char* headerKeys[] = {"Location"};
 
+  // Preserve the most recently resolved URL between retries. If GitHub already
+  // redirected us to release-assets.githubusercontent.com and only the body read
+  // failed, the next attempt retries that asset URL directly.
+  String currentUrl = OTA_MANIFEST_URL;
+
   for (uint8_t attempt = 1; attempt <= MAX_MANIFEST_ATTEMPTS; ++attempt) {
-    String currentUrl = OTA_MANIFEST_URL;
     String payload;
     bool retry = false;
 
@@ -683,6 +780,8 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
         retry = true;
         break;
       }
+
+      http.addHeader("Accept-Encoding", "identity");
 
       const uint32_t requestStarted = millis();
       const int code = http.GET();
@@ -728,7 +827,8 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
       }
 
       const uint32_t payloadStarted = millis();
-      payload = http.getString();
+      const bool bodyOk = otaReadTextBody(
+          http, payload, contentLength, MANIFEST_BODY_IDLE_TIMEOUT_MS, error);
       const uint32_t payloadMs = (uint32_t)(millis() - payloadStarted);
       otaDiag.manifestBytes = payload.length();
 
@@ -738,18 +838,8 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
       addLog("OTA NET: manifest payload " + String(otaDiag.manifestBytes) +
              " B read in " + String(payloadMs) + " ms");
 
-      if (payload.length() == 0) {
-        error = "Manifest payload empty";
-        addLog("OTA NET: manifest empty payload despite HTTP 200; retrying");
-        retry = true;
-        break;
-      }
-
-      if (contentLength > 0 && payload.length() != (size_t)contentLength) {
-        error = "Manifest payload incomplete";
-        addLog("OTA NET: manifest body length mismatch HTTP=" +
-               String(contentLength) + " actual=" + String(payload.length()) +
-               "; retrying");
+      if (!bodyOk) {
+        addLog("OTA NET: manifest body read failed: " + error + "; retrying");
         retry = true;
         break;
       }
@@ -785,7 +875,8 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
     }
 
     if (attempt < MAX_MANIFEST_ATTEMPTS) {
-      addLog("OTA NET: manifest retry in 500 ms: " + error);
+      addLog("OTA NET: manifest retry in 500 ms: " + error +
+             " | retryHost=" + otaUrlHostForLog(currentUrl));
       delay(500);
       yield();
     } else if (retry) {
@@ -936,7 +1027,7 @@ static bool downloadAndFlashOta(const OtaManifest& manifest, String& error) {
 
   addLog("OTA NET: firmware stream started");
 
-  while (http.connected() && total < manifest.size) {
+  while (total < manifest.size) {
     size_t available = stream->available();
     if (available) {
       size_t want = (available < sizeof(buffer)) ? available : sizeof(buffer);

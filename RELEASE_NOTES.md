@@ -1,19 +1,50 @@
-# ESP8266 Moisture Sensor v0.1.23
+# ESP8266 Moisture Sensor v0.1.24
 
-This release changes the automatic NTP synchronization interval from the ESP8266 core default of one hour to once per day.
+This release adds detailed diagnostics for the Internet OTA update path.
 
-## Daily NTP synchronization
+The manual Wi-Fi firmware upload is unchanged.
 
-The ESP8266 Arduino core normally refreshes SNTP time every hour.
+## Internet OTA diagnostics
 
-The firmware now overrides the SNTP update interval to:
+The System Log now records additional information for the GitHub OTA process, including:
 
-`24 hours`
+- Wi-Fi RSSI before Internet requests
+- free heap before TLS / firmware download
+- manifest HTTP result
+- manifest request duration
+- manifest response size
+- release-note size
+- expected firmware size
+- available sketch space
+- firmware HTTP result
+- time until firmware response headers arrive
+- firmware Content-Length
+- download progress with elapsed time and average KiB/s
+- 5 / 10 / 15 second data-stall messages
+- number of bytes received before a timeout or incomplete download
+- final download duration and average transfer rate
+- more detailed messages for size mismatch, Update.begin, flash-write and finalize failures
 
-The initial NTP synchronization after boot is unchanged. The configured NTP server and timezone are also unchanged.
+## Persistent diagnostics
 
-Saving the NTP server or timezone in System Settings still immediately reconfigures the time service.
+A small separate OTA diagnostic record is stored in EEPROM.
+
+After a reboot, the System Log can report the previous Internet OTA request timings, HTTP codes, transferred bytes, Wi-Fi RSSI and free heap.
+
+The existing OTA result record layout is retained unchanged.
+
+## No OTA behavior change
+
+This release is intended for diagnosis. It does not change:
+
+- firmware URL handling
+- TLS mode
+- redirect handling
+- SHA-256 verification
+- firmware flashing
+- reboot workflow
+- manual firmware upload
 
 ## Version
 
-v0.1.23
+v0.1.24

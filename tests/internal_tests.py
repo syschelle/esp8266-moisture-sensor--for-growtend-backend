@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.23", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.23", "0.1.23"))
+check("version newer patch", is_newer("0.1.24", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.24", "0.1.24"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -94,13 +94,25 @@ check("daily SNTP update interval override", "uint32_t sntp_update_delay_MS_rfc_
 check("daily SNTP interval is 24 hours", "return 24UL * 60UL * 60UL * 1000UL;" in MAIN)
 check("NTP configuration still uses configured timezone and server", "configTime(cfg.timezone, cfg.ntpServer);" in MAIN)
 
+check("OTA network manifest timing logs", "OTA NET: manifest HTTP " in MAIN and "otaDiag.manifestMs" in MAIN)
+check("OTA manifest payload diagnostics", "OTA NET: manifest payload " in MAIN and "OTA NET: release notes " in MAIN)
+check("OTA firmware header timing logs", "OTA NET: firmware HTTP " in MAIN and "otaDiag.firmwareHeaderMs" in MAIN)
+check("OTA firmware preflight diagnostics", "OTA NET: firmware preflight size " in MAIN and "free sketch " in MAIN)
+check("OTA firmware progress throughput logs", "otaRateKbs(total, otaDiag.downloadMs)" in MAIN and "KiB/s" in MAIN)
+check("OTA firmware stall diagnostics", "OTA NET: waiting for firmware data " in MAIN)
+check("OTA firmware timeout diagnostics", "OTA NET: firmware timeout after " in MAIN)
+check("OTA diagnostics persisted separately", "struct OtaDiagRecord" in MAIN and "OTA_DIAG_OFFSET = 640" in MAIN)
+check("OTA diagnostics reported after reboot", "OTA diag: manifest HTTP " in MAIN and "OTA diag: download " in MAIN)
+check("existing OTA record layout retained", 'char error[64] = {0};' in MAIN and "struct OtaDiagRecord" in MAIN)
+check("manual OTA implementation retained", "Manual OTA: upload started" in MAIN and "form.append('firmware',f,f.name)" in UI)
+
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
 check("OTA update endpoint", '"/api/ota/update"' in MAIN)
 check("OTA status endpoint", '"/api/ota/status"' in MAIN)
 check("SHA-256 verification", "Firmware SHA-256 mismatch" in MAIN)
 check("OTA progress milestones", 'nextLogPercent = 25' in MAIN and 'nextLogPercent += 25' in MAIN)
-check("OTA System log progress", 'addLog("OTA: download " + String(nextLogPercent) + "%")' in MAIN)
+check("OTA System log progress", 'addLog("OTA: download " + String(nextLogPercent) + "%" + ' in MAIN or 'addLog("OTA: download " + String(nextLogPercent) + "%, "' in MAIN)
 check("no unsupported Update.abort", "Update.abort()" not in MAIN)
 check("no mixed-type min in OTA buffer sizing", "min(available, sizeof(buffer))" not in MAIN)
 
@@ -155,7 +167,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.23", bool(m) and m.group(1) == "0.1.23")
+check("firmware version 0.1.24", bool(m) and m.group(1) == "0.1.24")
 
 if failures:
     print("\nInternal regression tests failed:")

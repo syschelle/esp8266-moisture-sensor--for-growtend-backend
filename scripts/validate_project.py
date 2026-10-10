@@ -14,8 +14,8 @@ ui = (root / "src" / "web_ui.h").read_text(encoding="utf-8")
 readme = (root / "README.md").read_text(encoding="utf-8")
 release = (root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
 
-require('#define APP_VERSION "0.1.19"' in version_h, "version header")
-require("v0.1.19" in readme and "v0.1.19" in release, "release version consistency")
+require('#define APP_VERSION "0.1.20"' in version_h, "version header")
+require("v0.1.20" in readme and "v0.1.20" in release, "release version consistency")
 require('"/api/current-values"' in main, "current-values API")
 require('"/api/health"' in main, "health API")
 require('pin != "A0"' in main, "A0 pin validation")
@@ -32,7 +32,7 @@ require("runs-on: ubuntu-24.04" in workflow, "fixed Ubuntu runner")
 require("pio run -e d1_mini" in workflow, "PlatformIO firmware build")
 require("python scripts/make_ota.py" in workflow, "OTA package creation")
 require("actions/upload-artifact@v4" in workflow, "firmware artifact upload")
-require("esp8266-moisture-sensor-v0.1.19" in workflow, "versioned firmware artifact name")
+require("esp8266-moisture-sensor-v0.1.20" in workflow, "versioned firmware artifact name")
 require("ota-dist/firmware.bin" in workflow, "firmware.bin artifact")
 require('tags:' in workflow and '"v*"' in workflow, "tag-triggered release workflow")
 require("permissions:" in workflow and "contents: write" in workflow, "release write permission")
@@ -141,9 +141,9 @@ require("SENSOR_ADC_MIN_PLAUSIBLE" not in main and "SENSOR_ADC_MAX_PLAUSIBLE" no
 
 require("dry <= SENSOR_ADC_DISCONNECTED_MAX" in main and "wet <= SENSOR_ADC_DISCONNECTED_MAX" in main, "manual calibration lower bound")
 
-require('class="otaStatus" id="otaMsg"' in ui, "readable OTA status style")
-require('<div class="hint" id="otaMsg">' not in ui, "OTA status not muted")
-require(".otaStatus{" in ui and "font-weight:600" in ui, "OTA status emphasis")
+require('<div class="hint" id="otaMsg"></div>' in ui, "original OTA status markup retained")
+require("#otaMsg{color:var(--text)}" in ui, "OTA status text color override")
+require(".otaStatus{" not in ui, "no custom OTA status box style")
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

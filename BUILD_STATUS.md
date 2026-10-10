@@ -1,16 +1,17 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.27
+# Build / validation status — ESP8266 Moisture Sensor v0.1.28
 
 ## Completed in the artifact environment
 
 - static project validation: PASS
 - internal regression tests: PASS
-- `HTTPClient::getString()` removed from manifest path: PASS
-- streamed manifest body reader: PASS
-- expected Content-Length body read: PASS
-- manifest body read independent of HTTP connected state: PASS
-- 3-second manifest body idle timeout: PASS
-- resolved asset URL retained for retries: PASS
-- firmware stream no longer gated by `http.connected()`: PASS
+- compact metadata-only manifest restored: PASS
+- embedded release notes removed from manifest: PASS
+- separate release README retained: PASS
+- fixed 768-byte manifest buffer: PASS
+- large manifest String allocation removed: PASS
+- install button waits for separate release text: PASS
+- GitHub redirect diagnostics retained: PASS
+- version-specific firmware URL retained: PASS
 - manual OTA implementation retained: PASS
 - NTP synchronization logging retained: PASS
 - JavaScript syntax: PASS

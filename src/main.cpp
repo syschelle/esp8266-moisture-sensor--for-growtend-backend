@@ -244,7 +244,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.27: deviceName is the single authoritative identity.
+    // v0.1.28: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -570,7 +570,6 @@ struct OtaManifest {
   String version;
   String url;
   String sha256;
-  String releaseNotes;
   size_t size = 0;
 };
 
@@ -638,16 +637,21 @@ static String otaResolveRedirectUrl(const String& currentUrl, const String& loca
   return "";
 }
 
-static bool otaReadTextBody(HTTPClient& http, String& payload, int contentLength,
-                                uint32_t idleTimeoutMs, String& error) {
-  payload = "";
+static bool otaReadManifestBody(HTTPClient& http, char* buffer, size_t capacity,
+                                    int contentLength, size_t& bodyLen,
+                                    uint32_t idleTimeoutMs, String& error) {
+  bodyLen = 0;
 
-  if (contentLength > 0) {
-    if (!payload.reserve((unsigned int)contentLength + 1U)) {
-      error = "Manifest memory reserve failed";
-      addLog("OTA NET: manifest String reserve failed for " + String(contentLength + 1) + " B");
-      return false;
-    }
+  if (capacity < 2) {
+    error = "Manifest buffer invalid";
+    return false;
+  }
+
+  if (contentLength > 0 && (size_t)contentLength >= capacity) {
+    error = "Manifest too large";
+    addLog("OTA NET: manifest too large for fixed buffer: " +
+           String(contentLength) + " B");
+    return false;
   }
 
   WiFiClient* stream = http.getStreamPtr();
@@ -657,34 +661,34 @@ static bool otaReadTextBody(HTTPClient& http, String& payload, int contentLength
     return false;
   }
 
-  uint8_t buffer[256];
-  size_t total = 0;
   uint32_t lastDataMs = millis();
   uint32_t lastWaitLogMs = 0;
 
-  addLog("OTA NET: manifest body reader start, available=" +
-         String(stream->available()) + ", connected=" +
-         String(stream->connected() ? 1 : 0));
+  addLog("OTA NET: manifest body reader start, expected=" +
+         String(contentLength) + " B, available=" +
+         String(stream->available()));
 
-  while (contentLength <= 0 || total < (size_t)contentLength) {
+  while (contentLength <= 0 || bodyLen < (size_t)contentLength) {
     int available = stream->available();
 
     if (available > 0) {
+      size_t freeSpace = capacity - 1 - bodyLen;
+      if (freeSpace == 0) {
+        error = "Manifest too large";
+        addLog("OTA NET: manifest fixed buffer exhausted at " +
+               String(bodyLen) + " B");
+        return false;
+      }
+
       size_t want = (size_t)available;
-      if (want > sizeof(buffer)) want = sizeof(buffer);
+      if (want > freeSpace) want = freeSpace;
 
-      int got = stream->read(buffer, want);
+      int got = stream->read(reinterpret_cast<uint8_t*>(buffer + bodyLen), want);
       if (got > 0) {
-        if (!payload.concat(reinterpret_cast<const char*>(buffer), (unsigned int)got)) {
-          error = "Manifest memory append failed";
-          addLog("OTA NET: manifest String append failed after " + String(total) + " B");
-          return false;
-        }
-
-        total += (size_t)got;
+        bodyLen += (size_t)got;
         lastDataMs = millis();
 
-        if (contentLength > 0 && total >= (size_t)contentLength) break;
+        if (contentLength > 0 && bodyLen >= (size_t)contentLength) break;
         continue;
       }
     }
@@ -697,15 +701,14 @@ static bool otaReadTextBody(HTTPClient& http, String& payload, int contentLength
     if (idleMs >= 1000UL && idleMs - lastWaitLogMs >= 1000UL) {
       lastWaitLogMs = idleMs;
       addLog("OTA NET: waiting for manifest body " + String(idleMs) +
-             " ms, received " + String(total) + "/" +
-             String(contentLength) + " B, connected=" +
-             String(stream->connected() ? 1 : 0));
+             " ms, received " + String(bodyLen) + "/" +
+             String(contentLength) + " B");
     }
 
     if (idleMs >= idleTimeoutMs) {
-      error = total == 0 ? "Manifest payload empty" : "Manifest payload incomplete";
+      error = bodyLen == 0 ? "Manifest payload empty" : "Manifest payload incomplete";
       addLog("OTA NET: manifest body timeout after " + String(idleMs) +
-             " ms, received " + String(total) + "/" +
+             " ms, received " + String(bodyLen) + "/" +
              String(contentLength) + " B");
       return false;
     }
@@ -714,19 +717,20 @@ static bool otaReadTextBody(HTTPClient& http, String& payload, int contentLength
     yield();
   }
 
-  if (contentLength > 0 && total != (size_t)contentLength) {
+  if (contentLength > 0 && bodyLen != (size_t)contentLength) {
     error = "Manifest payload incomplete";
     addLog("OTA NET: manifest body length mismatch HTTP=" +
-           String(contentLength) + " actual=" + String(total));
+           String(contentLength) + " actual=" + String(bodyLen));
     return false;
   }
 
-  if (total == 0) {
+  if (bodyLen == 0) {
     error = "Manifest payload empty";
     addLog("OTA NET: manifest body reader returned 0 B");
     return false;
   }
 
+  buffer[bodyLen] = '\0';
   return true;
 }
 
@@ -745,15 +749,12 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
   static constexpr uint8_t MAX_MANIFEST_ATTEMPTS = 3;
   static constexpr uint8_t MAX_REDIRECTS = 6;
   static constexpr uint32_t MANIFEST_BODY_IDLE_TIMEOUT_MS = 3000;
+  static constexpr size_t MANIFEST_BUFFER_SIZE = 768;
   const char* headerKeys[] = {"Location"};
 
-  // Preserve the most recently resolved URL between retries. If GitHub already
-  // redirected us to release-assets.githubusercontent.com and only the body read
-  // failed, the next attempt retries that asset URL directly.
   String currentUrl = OTA_MANIFEST_URL;
 
   for (uint8_t attempt = 1; attempt <= MAX_MANIFEST_ATTEMPTS; ++attempt) {
-    String payload;
     bool retry = false;
 
     addLog("OTA NET: manifest attempt " + String(attempt) + "/" +
@@ -826,16 +827,19 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
         break;
       }
 
+      char payload[MANIFEST_BUFFER_SIZE];
+      size_t payloadLen = 0;
       const uint32_t payloadStarted = millis();
-      const bool bodyOk = otaReadTextBody(
-          http, payload, contentLength, MANIFEST_BODY_IDLE_TIMEOUT_MS, error);
+      const bool bodyOk = otaReadManifestBody(
+          http, payload, sizeof(payload), contentLength, payloadLen,
+          MANIFEST_BODY_IDLE_TIMEOUT_MS, error);
       const uint32_t payloadMs = (uint32_t)(millis() - payloadStarted);
-      otaDiag.manifestBytes = payload.length();
+      otaDiag.manifestBytes = payloadLen;
 
       http.end();
       client.stop();
 
-      addLog("OTA NET: manifest payload " + String(otaDiag.manifestBytes) +
+      addLog("OTA NET: manifest payload " + String(payloadLen) +
              " B read in " + String(payloadMs) + " ms");
 
       if (!bodyOk) {
@@ -845,7 +849,7 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
       }
 
       JsonDocument doc;
-      DeserializationError jsonError = deserializeJson(doc, payload);
+      DeserializationError jsonError = deserializeJson(doc, payload, payloadLen);
       if (jsonError) {
         error = "Manifest JSON invalid";
         addLog("OTA NET: manifest JSON parse failed: " + String(jsonError.c_str()));
@@ -856,11 +860,10 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
       out.version = String(doc["version"] | "");
       out.url = String(doc["url"] | "");
       out.sha256 = String(doc["sha256"] | "");
-      out.releaseNotes = String(doc["release_notes"] | "");
       out.size = doc["size"] | 0;
       out.sha256.toLowerCase();
 
-      addLog("OTA NET: release notes " + String(out.releaseNotes.length()) +
+      addLog("OTA NET: compact manifest " + String(payloadLen) +
              " B, firmware " + String(out.size) + " B");
 
       if (!out.version.length() || !out.url.startsWith("https://") ||
@@ -1149,6 +1152,8 @@ static bool fetchOtaReadme(String& content, String& error) {
   }
 
   addLog("OTA: loading release README");
+  addLog("OTA README: heap " + String(ESP.getFreeHeap()) +
+         " B, RSSI " + String(WiFi.RSSI()) + " dBm");
 
   BearSSL::WiFiClientSecure client;
   client.setInsecure();
@@ -1157,20 +1162,27 @@ static bool fetchOtaReadme(String& content, String& error) {
   HTTPClient http;
   http.setTimeout(15000);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  http.setReuse(false);
 
   if (!http.begin(client, OTA_README_URL)) {
     error = "README connection failed";
     return false;
   }
 
+  const uint32_t started = millis();
   const int code = http.GET();
+  const uint32_t elapsed = (uint32_t)(millis() - started);
+  const int contentLength = http.getSize();
+
+  addLog("OTA README: HTTP " + String(code) + " after " +
+         String(elapsed) + " ms, length " + String(contentLength));
+
   if (code != HTTP_CODE_OK) {
     error = "README HTTP " + String(code);
     http.end();
     return false;
   }
 
-  const int contentLength = http.getSize();
   if (contentLength > 16384) {
     error = "README too large";
     http.end();
@@ -1179,6 +1191,8 @@ static bool fetchOtaReadme(String& content, String& error) {
 
   content = http.getString();
   http.end();
+
+  addLog("OTA README: received " + String(content.length()) + " B");
 
   if (!content.length()) {
     error = "README empty";
@@ -1217,7 +1231,6 @@ static void apiOtaCheck() {
   doc["available_version"] = manifest.version;
   doc["update_available"] = available;
   doc["size"] = manifest.size;
-  if (available && manifest.releaseNotes.length()) doc["release_notes"] = manifest.releaseNotes;
   sendJson(doc);
 }
 

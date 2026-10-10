@@ -1,62 +1,50 @@
-# ESP8266 Moisture Sensor v0.1.27
+# ESP8266 Moisture Sensor v0.1.28
 
-This release fixes the next Internet OTA failure identified by the v0.1.26 diagnostics.
+This release rolls back the manifest design change that introduced Internet OTA instability.
 
-## Root cause identified
+## Root cause
 
-The GitHub redirect chain itself now completes successfully.
+Up to v0.1.20, `manifest.json` contained only compact firmware metadata.
 
-The System Log showed the final release asset returning:
+Starting with v0.1.21, the complete release text was embedded into `manifest.json` to save a second HTTPS request.
 
-- HTTP `200`
-- valid `Content-Length`
-- but `HTTPClient::getString()` returned an empty payload
+The v0.1.27 System Log identified the resulting memory problem:
 
-Example from the field log:
+`manifest String reserve failed for 2237 B`
 
-`manifest HTTP 200 ... length 1771`
+The ESP8266 still reported more than 25 KB of total free heap, but TLS processing, long GitHub redirect URLs and log Strings had fragmented the heap. A contiguous 2237-byte String allocation was therefore no longer available.
 
-followed by:
+## Compact manifest restored
 
-`manifest payload 0 B`
+The manifest contains only:
 
-The manifest JSON was therefore never received by the parser.
+- version
+- firmware URL
+- firmware size
+- SHA-256
 
-## Streamed manifest body reader
+Release notes are again stored separately in the release `README.md` asset.
 
-The manifest is no longer read with `HTTPClient::getString()`.
+The OTA page waits for the release text to load successfully before showing **Install update**.
 
-The firmware now reads the response body directly from the HTTP stream until the expected `Content-Length` has been received.
+## Fixed manifest buffer
 
-This body reader does not stop merely because the remote HTTP connection has already been marked as closed. That is important for GitHub release assets, where the server may close the connection immediately after sending the response.
+The manifest body no longer requires a dynamically allocated String.
 
-The manifest body reader:
+It is read into a fixed 768-byte buffer, avoiding the large contiguous heap allocation that failed in v0.1.27.
 
-- waits for the expected number of bytes
-- logs current body progress while waiting
-- uses a 3-second idle timeout
-- validates the final body length
-- requests identity encoding
-- retries on an empty or incomplete body
+The existing GitHub redirect diagnostics and retry handling are retained.
 
-## Faster retries
+## Firmware download
 
-After GitHub has already redirected the manifest request to the final release-assets host, a failed body read now retries that resolved URL directly instead of repeating the complete GitHub redirect chain.
+The version-specific firmware URL and streamed firmware download remain in place.
 
-The retry log shows the host that will be retried.
+## Manual OTA and NTP
 
-## Firmware download robustness
+The working manual Wi-Fi firmware upload is unchanged.
 
-The firmware download loop had the same dependency on `http.connected()`.
-
-It now continues reading until the complete expected firmware size has arrived or the existing data timeout is reached.
-
-SHA-256 verification and flash handling are unchanged.
-
-## Manual OTA
-
-The working manual Wi-Fi firmware upload remains unchanged.
+Daily NTP synchronization and NTP synchronization logging are unchanged.
 
 ## Version
 
-v0.1.27
+v0.1.28

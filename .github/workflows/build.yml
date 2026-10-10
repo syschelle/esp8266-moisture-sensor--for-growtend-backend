@@ -50,7 +50,7 @@ jobs:
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: esp8266-moisture-sensor-v0.1.27
+          name: esp8266-moisture-sensor-v0.1.28
           path: |
             ota-dist/firmware.bin
             ota-dist/firmware.bin.sha256

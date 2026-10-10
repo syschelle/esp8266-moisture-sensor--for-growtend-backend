@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, json, shutil, sys
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.27"
+VERSION = "0.1.28"
 REPO = "syschelle/esp8266-moisture-sensor--for-growtend-backend"
 BIN = ROOT / ".pio" / "build" / "d1_mini" / "firmware.bin"
 OUT = ROOT / "ota-dist"
@@ -22,8 +22,7 @@ manifest = {
     "version": VERSION,
     "url": f"https://github.com/{REPO}/releases/download/v{VERSION}/firmware.bin",
     "size": len(data),
-    "sha256": sha,
-    "release_notes": release_notes
+    "sha256": sha
 }
 (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 (OUT / "README.md").write_text(release_notes, encoding="utf-8")

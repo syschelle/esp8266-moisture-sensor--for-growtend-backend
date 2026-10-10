@@ -361,14 +361,7 @@ async function checkOta(){
   if(c.update_available){
    otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar. Lade Änderungen…':'New firmware available. Loading changes…';
 
-   let releaseNotesReady=false;
-   if(c.release_notes){
-    otaReadme.textContent=c.release_notes;
-    otaReadmeCard.style.display='block';
-    releaseNotesReady=true;
-   }else{
-    releaseNotesReady=await loadOtaReadme();
-   }
+   const releaseNotesReady=await loadOtaReadme();
 
    if(releaseNotesReady){
     otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar.':'New firmware available.';

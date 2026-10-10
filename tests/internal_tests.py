@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.27", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.27", "0.1.27"))
+check("version newer patch", is_newer("0.1.28", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.28", "0.1.28"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -80,10 +80,10 @@ check("manual calibration uses canonical ADC constants", "SENSOR_ADC_DISCONNECTE
 check("manual calibration lower bound matches disconnected threshold", "dry <= SENSOR_ADC_DISCONNECTED_MAX" in MAIN and "wet <= SENSOR_ADC_DISCONNECTED_MAX" in MAIN)
 check("obsolete manual calibration constants absent", "SENSOR_ADC_MIN_PLAUSIBLE" not in MAIN and "SENSOR_ADC_MAX_PLAUSIBLE" not in MAIN and "SENSOR_ADC_PLAUSIBLE_MIN" not in MAIN)
 
-check("manifest embeds release notes", '"release_notes": release_notes' in OTA_SCRIPT)
-check("OTA check returns embedded release notes", 'doc["release_notes"] = manifest.releaseNotes' in MAIN)
-check("OTA UI uses embedded release notes", "if(c.release_notes)" in UI and "otaReadme.textContent=c.release_notes" in UI)
-check("OTA fallback is awaited only when release notes are absent", "releaseNotesReady=await loadOtaReadme()" in UI and "if(c.release_notes)" in UI)
+check("manifest stays compact without release notes", '"release_notes": release_notes' not in OTA_SCRIPT)
+check("OTA check excludes embedded release notes", 'doc["release_notes"] = manifest.releaseNotes' not in MAIN)
+check("OTA UI loads release notes separately", "const releaseNotesReady=await loadOtaReadme()" in UI)
+check("OTA release notes request is awaited", "const releaseNotesReady=await loadOtaReadme()" in UI)
 check("manual OTA uses multipart FormData", "const form=new FormData()" in UI and "form.append('firmware',f,f.name)" in UI)
 check("manual OTA has upload progress", "xhr.upload.onprogress" in UI)
 check("manual OTA posts to local endpoint", "xhr.open('POST','/api/ota/upload',true)" in UI)
@@ -95,7 +95,7 @@ check("daily SNTP interval is 24 hours", "return 24UL * 60UL * 60UL * 1000UL;" i
 check("NTP configuration still uses configured timezone and server", "configTime(cfg.timezone, cfg.ntpServer);" in MAIN)
 
 check("OTA network manifest timing logs", "OTA NET: manifest HTTP " in MAIN and "otaDiag.manifestMs" in MAIN)
-check("OTA manifest payload diagnostics", "OTA NET: manifest payload " in MAIN and "OTA NET: release notes " in MAIN)
+check("OTA compact manifest diagnostics", "OTA NET: manifest payload " in MAIN and "OTA NET: compact manifest " in MAIN)
 check("OTA firmware header timing logs", "OTA NET: firmware HTTP " in MAIN and "otaDiag.firmwareHeaderMs" in MAIN)
 check("OTA firmware preflight diagnostics", "OTA NET: firmware preflight size " in MAIN and "free sketch " in MAIN)
 check("OTA firmware progress throughput logs", "otaRateKbs(total, otaDiag.downloadMs)" in MAIN and "KiB/s" in MAIN)
@@ -118,7 +118,7 @@ check("daily NTP interval retained after logging change", "return 24UL * 60UL * 
 
 check("manifest manual redirect handling", "HTTPC_DISABLE_FOLLOW_REDIRECTS" in MAIN and "OTA NET: manifest redirect " in MAIN)
 check("manifest redirect location header", 'const char* headerKeys[] = {"Location"};' in MAIN and "http.collectHeaders(headerKeys, 1);" in MAIN)
-check("manifest stream reader rejects empty HTTP 200 body", "manifest body reader returned 0 B" in MAIN or "Manifest payload empty" in MAIN)
+check("manifest fixed reader rejects empty HTTP 200 body", "manifest body reader returned 0 B" in MAIN or "Manifest payload empty" in MAIN)
 check("manifest body length validation", "manifest body length mismatch HTTP=" in MAIN)
 check("manifest three attempts", "MAX_MANIFEST_ATTEMPTS = 3" in MAIN)
 check("manifest redirect limit", "MAX_REDIRECTS = 6" in MAIN)
@@ -127,15 +127,24 @@ check("redirect log includes location length", "locationLen=" in MAIN)
 check("versioned firmware URL removes latest redirect", "releases/download/v{VERSION}/firmware.bin" in OTA_SCRIPT)
 check("manual OTA remains unchanged", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
 
-check("manifest uses streaming body reader", "static bool otaReadTextBody(" in MAIN and "otaReadTextBody(" in MAIN)
+check("manifest uses fixed-buffer body reader", "static bool otaReadManifestBody(" in MAIN and "otaReadManifestBody(" in MAIN)
 check("manifest no longer uses getString", "payload = http.getString();" not in MAIN)
-check("manifest waits for expected body despite disconnected socket", "while (contentLength <= 0 || total < (size_t)contentLength)" in MAIN)
+check("manifest waits for expected body despite disconnected socket", "while (contentLength <= 0 || bodyLen < (size_t)contentLength)" in MAIN)
 check("manifest body idle timeout", "MANIFEST_BODY_IDLE_TIMEOUT_MS = 3000" in MAIN)
 check("manifest retry reuses resolved URL", "String currentUrl = OTA_MANIFEST_URL;" in MAIN and "retryHost=" in MAIN)
 check("manifest requests identity encoding", 'http.addHeader("Accept-Encoding", "identity");' in MAIN)
 check("firmware download not gated by http connected state", "while (total < manifest.size)" in MAIN and "while (http.connected() && total < manifest.size)" not in MAIN)
 check("manual OTA still retained", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
 check("NTP sync logging still retained", "NTP: synchronized local=" in MAIN)
+
+check("manifest fixed buffer avoids large String allocation", "MANIFEST_BUFFER_SIZE = 768" in MAIN and "char payload[MANIFEST_BUFFER_SIZE]" in MAIN)
+check("manifest releaseNotes String removed", "String releaseNotes;" not in MAIN)
+check("manifest asset excludes release notes", '"release_notes": release_notes' not in OTA_SCRIPT)
+check("README remains separate release asset", '(OUT / "README.md").write_text(release_notes' in OTA_SCRIPT)
+check("release notes loaded separately before install", "const releaseNotesReady=await loadOtaReadme()" in UI)
+check("README diagnostics retained", "OTA README: HTTP " in MAIN and "OTA README: received " in MAIN)
+check("manual OTA retained after manifest rollback", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
+check("NTP logging retained after manifest rollback", "NTP: synchronized local=" in MAIN)
 
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
@@ -181,10 +190,10 @@ check("OTA status keeps original hint markup", '<div class="hint" id="otaMsg"></
 check("OTA status text color override", "#otaMsg{color:var(--text)}" in UI)
 check("no custom OTA status box style", ".otaStatus{" not in UI)
 
-check("install button waits for release notes", "let releaseNotesReady=false" in UI and "if(releaseNotesReady)" in UI)
+check("install button waits for release notes", "const releaseNotesReady=await loadOtaReadme()" in UI and "if(releaseNotesReady)" in UI)
 check("install button hidden while release notes load", "otaInstallBtn.style.display='none'" in UI and "otaInstallBtn.disabled=true" in UI)
-check("embedded release notes unlock install button", "otaReadme.textContent=c.release_notes" in UI and "releaseNotesReady=true" in UI)
-check("fallback release notes awaited before install", "releaseNotesReady=await loadOtaReadme()" in UI)
+check("separate release notes unlock install button", "const releaseNotesReady=await loadOtaReadme()" in UI and "if(releaseNotesReady)" in UI)
+check("release notes awaited before install", "const releaseNotesReady=await loadOtaReadme()" in UI)
 check("release note loader reports success", "return true;" in UI and "return false;" in UI)
 check("install button shown inside ready block", "if(releaseNotesReady)" in UI and "otaInstallBtn.style.display='inline-block'" in UI)
 
@@ -198,7 +207,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.27", bool(m) and m.group(1) == "0.1.27")
+check("firmware version 0.1.28", bool(m) and m.group(1) == "0.1.28")
 
 if failures:
     print("\nInternal regression tests failed:")

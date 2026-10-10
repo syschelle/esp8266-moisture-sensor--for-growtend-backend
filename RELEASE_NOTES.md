@@ -1,50 +1,28 @@
-# ESP8266 Moisture Sensor v0.1.24
+# ESP8266 Moisture Sensor v0.1.25
 
-This release adds detailed diagnostics for the Internet OTA update path.
+This release adds detailed System Log entries after every successful NTP/SNTP time synchronization.
 
-The manual Wi-Fi firmware upload is unchanged.
+## NTP synchronization logging
 
-## Internet OTA diagnostics
+The ESP8266 time-set callback is now monitored by the main loop.
 
-The System Log now records additional information for the GitHub OTA process, including:
+After every successful NTP update, the System Log records:
 
-- Wi-Fi RSSI before Internet requests
-- free heap before TLS / firmware download
-- manifest HTTP result
-- manifest request duration
-- manifest response size
-- release-note size
-- expected firmware size
-- available sketch space
-- firmware HTTP result
-- time until firmware response headers arrive
-- firmware Content-Length
-- download progress with elapsed time and average KiB/s
-- 5 / 10 / 15 second data-stall messages
-- number of bytes received before a timeout or incomplete download
-- final download duration and average transfer rate
-- more detailed messages for size mismatch, Update.begin, flash-write and finalize failures
+- determined local date and time
+- configured NTP server
+- configured POSIX timezone
+- current Wi-Fi RSSI
 
-## Persistent diagnostics
+Example:
 
-A small separate OTA diagnostic record is stored in EEPROM.
+`NTP: synchronized local=2026-10-10 18:55:03 | server=de.pool.ntp.org | TZ=CET-1CEST,M3.5.0,M10.5.0/3 | RSSI=-58 dBm`
 
-After a reboot, the System Log can report the previous Internet OTA request timings, HTTP codes, transferred bytes, Wi-Fi RSSI and free heap.
+This applies to the initial successful synchronization after boot as well as the automatic daily refresh.
 
-The existing OTA result record layout is retained unchanged.
+## Daily NTP interval
 
-## No OTA behavior change
-
-This release is intended for diagnosis. It does not change:
-
-- firmware URL handling
-- TLS mode
-- redirect handling
-- SHA-256 verification
-- firmware flashing
-- reboot workflow
-- manual firmware upload
+The existing 24-hour automatic SNTP refresh interval is unchanged.
 
 ## Version
 
-v0.1.24
+v0.1.25

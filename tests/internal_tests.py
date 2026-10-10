@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.24", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.24", "0.1.24"))
+check("version newer patch", is_newer("0.1.25", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.25", "0.1.25"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -106,6 +106,16 @@ check("OTA diagnostics reported after reboot", "OTA diag: manifest HTTP " in MAI
 check("existing OTA record layout retained", 'char error[64] = {0};' in MAIN and "struct OtaDiagRecord" in MAIN)
 check("manual OTA implementation retained", "Manual OTA: upload started" in MAIN and "form.append('firmware',f,f.name)" in UI)
 
+check("NTP core callback header", "#include <coredecls.h>" in MAIN)
+check("NTP synchronization callback registered", "settimeofday_cb(onNtpTimeSet);" in MAIN)
+check("NTP callback remains lightweight", "static void onNtpTimeSet()" in MAIN and "ntpTimeUpdatePending = true;" in MAIN)
+check("NTP synchronization log processed in loop", "ntpUpdateLogLoop();" in MAIN)
+check("NTP synchronization log contains local date time", 'NTP: synchronized local=' in MAIN and "localTimestamp(now)" in MAIN)
+check("NTP synchronization log contains server", '" | server=" + String(cfg.ntpServer)' in MAIN)
+check("NTP synchronization log contains timezone", '" | TZ=" + String(cfg.timezone)' in MAIN)
+check("NTP synchronization log contains RSSI", '" | RSSI=" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0)' in MAIN)
+check("daily NTP interval retained after logging change", "return 24UL * 60UL * 60UL * 1000UL;" in MAIN)
+
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
 check("OTA update endpoint", '"/api/ota/update"' in MAIN)
@@ -167,7 +177,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.24", bool(m) and m.group(1) == "0.1.24")
+check("firmware version 0.1.25", bool(m) and m.group(1) == "0.1.25")
 
 if failures:
     print("\nInternal regression tests failed:")

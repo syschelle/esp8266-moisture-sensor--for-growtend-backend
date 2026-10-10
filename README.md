@@ -2,7 +2,7 @@
 
 This ESP8266-based sensor reads one capacitive analog soil-moisture sensor and exposes the current moisture value via HTTP for direct integration with the `syschelle/growtent-backend` project.
 
-**Current version: v0.1.24**
+**Current version: v0.1.25**
 
 ## Scope
 
@@ -35,7 +35,7 @@ Verify the accepted ADC input voltage for the exact ESP8266 board before connect
 
 The signal pin is configurable in the web interface.
 
-On ESP8266 v0.1.24 the supported analog input is:
+On ESP8266 v0.1.25 the supported analog input is:
 
 `A0`
 
@@ -102,7 +102,7 @@ Example:
   "device": "SoilSensor-1",
   "sensor": "Topf 1",
   "signal_pin": "A0",
-  "firmware_version": "0.1.24",
+  "firmware_version": "0.1.25",
   "raw_adc": 487,
   "moisture_percent": 63.4,
   "calibrated": true,
@@ -271,3 +271,10 @@ Release changes are embedded directly in `manifest.json`. This avoids a second b
 The Internet OTA path writes detailed network diagnostics to the System Log: HTTP timings/codes, Wi-Fi RSSI, free heap, response sizes, download throughput and data-stall information.
 
 A compact diagnostic record is also persisted in EEPROM so relevant Internet OTA metrics can be reported after a reboot.
+
+
+### NTP synchronization logging
+
+Every successful SNTP synchronization is reported in the System Log. The entry includes the resulting local date/time, configured NTP server, configured POSIX timezone and Wi-Fi RSSI.
+
+The existing automatic synchronization interval remains 24 hours.

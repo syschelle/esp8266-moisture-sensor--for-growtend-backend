@@ -7,6 +7,7 @@
 #include <ArduinoJson.h>
 #include <Updater.h>
 #include <time.h>
+#include <coredecls.h>
 
 #include "version.h"
 #include "web_ui.h"
@@ -243,7 +244,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.24: deviceName is the single authoritative identity.
+    // v0.1.25: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -439,9 +440,34 @@ uint32_t sntp_update_delay_MS_rfc_not_less_than_15000() {
   return 24UL * 60UL * 60UL * 1000UL;
 }
 
+static volatile bool ntpTimeUpdatePending = false;
+
+static void onNtpTimeSet() {
+  // Keep the callback lightweight. The actual log entry is written from loop().
+  ntpTimeUpdatePending = true;
+}
+
+static void ntpUpdateLogLoop() {
+  if (!ntpTimeUpdatePending) return;
+  ntpTimeUpdatePending = false;
+
+  const time_t now = time(nullptr);
+  if (now <= 1700000000) {
+    addLog("NTP: synchronization callback received, but time is not valid yet");
+    return;
+  }
+
+  const String local = localTimestamp(now);
+  addLog("NTP: synchronized local=" + local +
+         " | server=" + String(cfg.ntpServer) +
+         " | TZ=" + String(cfg.timezone) +
+         " | RSSI=" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + " dBm");
+}
+
 static void configureTime() {
   // ESP8266: use the POSIX-TZ configTime overload directly.
   // This applies CET/CEST including automatic daylight-saving changes.
+  settimeofday_cb(onNtpTimeSet);
   configTime(cfg.timezone, cfg.ntpServer);
   setenv("TZ", cfg.timezone, 1);
   tzset();
@@ -1310,6 +1336,7 @@ void loop() {
   server.handleClient();
   wifiLoop();
   sensorLoop();
+  ntpUpdateLogLoop();
   otaLoop();
 
   if (restartPending && (int32_t)(millis() - restartAt) >= 0) {

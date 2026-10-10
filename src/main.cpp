@@ -168,7 +168,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.20: deviceName is the single authoritative identity.
+    // v0.1.21: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -448,6 +448,7 @@ struct OtaManifest {
   String version;
   String url;
   String sha256;
+  String releaseNotes;
   size_t size = 0;
 };
 
@@ -520,6 +521,7 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
   out.version = String(doc["version"] | "");
   out.url = String(doc["url"] | "");
   out.sha256 = String(doc["sha256"] | "");
+  out.releaseNotes = String(doc["release_notes"] | "");
   out.size = doc["size"] | 0;
   out.sha256.toLowerCase();
 
@@ -646,7 +648,13 @@ static void apiOtaCheck() {
   cachedOtaManifest = manifest; cachedOtaManifestValid = true;
   bool available = isNewerVersion(manifest.version, APP_VERSION);
   addLog(available ? ("OTA: update available " + manifest.version) : "OTA: firmware is up to date");
-  JsonDocument doc; doc["current_version"] = APP_VERSION; doc["available_version"] = manifest.version; doc["update_available"] = available; doc["size"] = manifest.size; sendJson(doc);
+  JsonDocument doc;
+  doc["current_version"] = APP_VERSION;
+  doc["available_version"] = manifest.version;
+  doc["update_available"] = available;
+  doc["size"] = manifest.size;
+  if (available && manifest.releaseNotes.length()) doc["release_notes"] = manifest.releaseNotes;
+  sendJson(doc);
 }
 
 static void apiOtaUpdate() {
@@ -875,35 +883,71 @@ static void scheduleRestart(uint32_t delayMs) {
   restartAt = millis() + delayMs;
 }
 
+static bool manualOtaStarted = false;
+static bool manualOtaWriteFailed = false;
+
 static void otaUploadHandler() {
   HTTPUpload& upload = server.upload();
+
   if (upload.status == UPLOAD_FILE_START) {
-    addLog("OTA upload started");
+    manualOtaStarted = false;
+    manualOtaWriteFailed = false;
+    addLog("Manual OTA: upload started (" + upload.filename + ")");
+
     const size_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-    if (!Update.begin(maxSketchSpace)) Update.printError(Serial);
+    if (!Update.begin(maxSketchSpace)) {
+      manualOtaWriteFailed = true;
+      addLog("Manual OTA: Update.begin failed");
+      Update.printError(Serial);
+    } else {
+      manualOtaStarted = true;
+    }
   } else if (upload.status == UPLOAD_FILE_WRITE) {
-    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) Update.printError(Serial);
+    if (!manualOtaStarted || manualOtaWriteFailed) return;
+
+    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+      manualOtaWriteFailed = true;
+      addLog("Manual OTA: flash write failed");
+      Update.printError(Serial);
+    }
   } else if (upload.status == UPLOAD_FILE_END) {
-    if (Update.end(true)) addLog("OTA upload finished: " + String(upload.totalSize) + " bytes");
-    else Update.printError(Serial);
+    if (!manualOtaStarted || manualOtaWriteFailed) {
+      addLog("Manual OTA: upload ended with error");
+      return;
+    }
+
+    if (Update.end(true)) {
+      addLog("Manual OTA: firmware installed (" + String(upload.totalSize) + " bytes)");
+    } else {
+      manualOtaWriteFailed = true;
+      addLog("Manual OTA: finalize failed");
+      Update.printError(Serial);
+    }
   } else if (upload.status == UPLOAD_FILE_ABORTED) {
+    manualOtaWriteFailed = true;
     Update.end();
-    addLog("OTA upload aborted");
+    addLog("Manual OTA: upload aborted");
   }
+
   yield();
 }
 
 static void otaUploadFinished() {
   JsonDocument doc;
-  if (Update.hasError()) {
+
+  if (!manualOtaStarted || manualOtaWriteFailed || Update.hasError()) {
     doc["ok"] = false;
-    doc["error"] = "OTA update failed";
+    doc["error"] = "Manual OTA update failed";
+    addLog("Manual OTA: request failed");
     sendJson(doc, 500);
-  } else {
-    doc["ok"] = true;
-    sendJson(doc);
-    scheduleRestart(1000);
+    return;
   }
+
+  doc["ok"] = true;
+  doc["restarting"] = true;
+  sendJson(doc);
+  addLog("Manual OTA: reboot scheduled");
+  scheduleRestart(1200);
 }
 
 

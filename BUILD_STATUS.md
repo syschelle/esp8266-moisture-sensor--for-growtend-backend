@@ -1,14 +1,16 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.20
+# Build / validation status — ESP8266 Moisture Sensor v0.1.21
 
 ## Completed in the artifact environment
 
-- based directly on v0.1.18: PASS
-- OTA workflow code unchanged: PASS
-- original OTA status markup retained: PASS
-- only OTA status text color overridden: PASS
-- no custom OTA status box styling: PASS
 - static project validation: PASS
 - internal regression tests: PASS
+- release notes embedded in OTA manifest: PASS
+- second blocking README request removed from current manifests: PASS
+- README endpoint retained as compatibility fallback: PASS
+- broken `uploadBuf()` call removed: PASS
+- manual OTA multipart upload: PASS
+- manual OTA progress reporting: PASS
+- manual OTA backend diagnostics: PASS
 - JavaScript syntax: PASS
 - ZIP packaging and SHA-256 generation: PASS
 

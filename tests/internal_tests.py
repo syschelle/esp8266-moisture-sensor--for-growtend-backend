@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.20", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.20", "0.1.20"))
+check("version newer patch", is_newer("0.1.21", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.21", "0.1.21"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -80,6 +80,16 @@ check("manual calibration uses canonical ADC constants", "SENSOR_ADC_DISCONNECTE
 check("manual calibration lower bound matches disconnected threshold", "dry <= SENSOR_ADC_DISCONNECTED_MAX" in MAIN and "wet <= SENSOR_ADC_DISCONNECTED_MAX" in MAIN)
 check("obsolete manual calibration constants absent", "SENSOR_ADC_MIN_PLAUSIBLE" not in MAIN and "SENSOR_ADC_MAX_PLAUSIBLE" not in MAIN and "SENSOR_ADC_PLAUSIBLE_MIN" not in MAIN)
 
+check("manifest embeds release notes", '"release_notes": release_notes' in OTA_SCRIPT)
+check("OTA check returns embedded release notes", 'doc["release_notes"] = manifest.releaseNotes' in MAIN)
+check("OTA UI uses embedded release notes", "if(c.release_notes)" in UI and "otaReadme.textContent=c.release_notes" in UI)
+check("OTA check no longer awaits second README request", "await loadOtaReadme()" not in UI)
+check("manual OTA uses multipart FormData", "const form=new FormData()" in UI and "form.append('firmware',f,f.name)" in UI)
+check("manual OTA has upload progress", "xhr.upload.onprogress" in UI)
+check("manual OTA posts to local endpoint", "xhr.open('POST','/api/ota/upload',true)" in UI)
+check("broken uploadBuf removed", "uploadBuf(" not in UI)
+check("manual OTA backend diagnostics", "Manual OTA: upload started" in MAIN and "Manual OTA: firmware installed" in MAIN)
+
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
 check("OTA update endpoint", '"/api/ota/update"' in MAIN)
@@ -117,7 +127,7 @@ check("sensor name input removed", 'id="sensorName"' not in UI)
 check("hostname-safe client validation", "const devicePattern=/^[A-Za-z0-9]" in UI)
 check("OTA README endpoint", '"/api/ota/readme"' in MAIN)
 check("OTA README card", 'id="otaReadmeCard"' in UI)
-check("OTA README loaded only for update", "await loadOtaReadme()" in UI)
+check("OTA README fallback retained", "loadOtaReadme()" in UI)
 check("OTA README asset contains release notes", 'release_notes = (ROOT / "RELEASE_NOTES.md").read_text' in OTA_SCRIPT)
 
 check("OTA status keeps original hint markup", '<div class="hint" id="otaMsg"></div>' in UI)
@@ -134,7 +144,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.20", bool(m) and m.group(1) == "0.1.20")
+check("firmware version 0.1.21", bool(m) and m.group(1) == "0.1.21")
 
 if failures:
     print("\nInternal regression tests failed:")

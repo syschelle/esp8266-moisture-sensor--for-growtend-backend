@@ -348,7 +348,12 @@ async function checkOta(){
   if(c.update_available){
    otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar.':'New firmware available.';
    otaInstallBtn.style.display='inline-block';
-   await loadOtaReadme();
+   if(c.release_notes){
+    otaReadme.textContent=c.release_notes;
+    otaReadmeCard.style.display='block';
+   }else{
+    loadOtaReadme();
+   }
   } else otaMsg.textContent=lang==='de'?'Keine neuere Version verfügbar.':'No newer version available.';
  }catch(e){ otaMsg.textContent=e.message; } finally { otaCheckBtn.disabled=false; }
 }
@@ -369,7 +374,83 @@ function watchOtaRestart(){
   }catch(_){ misses++; if(misses>2){ otaProgress.style.width='75%'; otaMsg.textContent=lang==='de'?'ESP startet neu…':'ESP is rebooting…'; } }
  },2000);
 }
-async function manualUpload(){try{let f=fwFile.files[0];if(!f)throw Error('Select firmware.bin');await uploadBuf(await f.arrayBuffer())}catch(e){otaMsg.textContent=e.message}}
+async function manualUpload(){
+ try{
+  const f=fwFile.files[0];
+  if(!f)throw Error(lang==='de'?'Bitte firmware.bin auswählen.':'Please select firmware.bin.');
+  if(!f.name.toLowerCase().endsWith('.bin'))throw Error(lang==='de'?'Bitte eine .bin-Datei auswählen.':'Please select a .bin file.');
+
+  otaCheckBtn.disabled=true;
+  otaInstallBtn.disabled=true;
+  otaProgress.style.width='0';
+  otaMsg.textContent=lang==='de'?'Firmware wird über WLAN hochgeladen…':'Uploading firmware over Wi-Fi…';
+
+  const form=new FormData();
+  form.append('firmware',f,f.name);
+
+  await new Promise((resolve,reject)=>{
+   const xhr=new XMLHttpRequest();
+   xhr.open('POST','/api/ota/upload',true);
+   xhr.timeout=120000;
+
+   xhr.upload.onprogress=(ev)=>{
+    if(ev.lengthComputable){
+     const pct=Math.max(1,Math.min(99,Math.round((ev.loaded/ev.total)*100)));
+     otaProgress.style.width=pct+'%';
+     otaMsg.textContent=(lang==='de'?'Firmware-Upload: ':'Firmware upload: ')+pct+'%';
+    }
+   };
+
+   xhr.onload=()=>{
+    let j={};
+    try{j=JSON.parse(xhr.responseText||'{}')}catch(_){}
+    if(xhr.status>=200&&xhr.status<300&&j.ok)resolve(j);
+    else reject(Error(j.error||xhr.responseText||('HTTP '+xhr.status)));
+   };
+   xhr.onerror=()=>reject(Error(lang==='de'?'WLAN-Verbindung beim Firmware-Upload unterbrochen.':'Wi-Fi connection interrupted during firmware upload.'));
+   xhr.ontimeout=()=>reject(Error(lang==='de'?'Firmware-Upload Zeitüberschreitung.':'Firmware upload timed out.'));
+   xhr.send(form);
+  });
+
+  otaProgress.style.width='100%';
+  otaMsg.textContent=lang==='de'?'Firmware übertragen. ESP startet neu…':'Firmware transferred. ESP is rebooting…';
+  watchManualOtaRestart();
+ }catch(e){
+  otaProgress.style.width='0';
+  otaMsg.textContent=e.message;
+  otaCheckBtn.disabled=false;
+  otaInstallBtn.disabled=false;
+ }
+}
+
+function watchManualOtaRestart(){
+ let sawOffline=false,tries=0;
+ const timer=setInterval(async()=>{
+  tries++;
+  try{
+   const st=await api('/api/state');
+   if(sawOffline||tries>=4){
+    clearInterval(timer);
+    otaCurrent.textContent='v'+String(st.version||'').replace(/^v/,'');
+    otaProgress.style.width='100%';
+    otaMsg.textContent=lang==='de'?'Manuelles Firmware-Update erfolgreich.':'Manual firmware update successful.';
+    otaCheckBtn.disabled=false;
+    otaInstallBtn.disabled=false;
+    fwFile.value='';
+   }
+  }catch(_){
+   sawOffline=true;
+   otaMsg.textContent=lang==='de'?'ESP startet neu…':'ESP is rebooting…';
+  }
+
+  if(tries>45){
+   clearInterval(timer);
+   otaMsg.textContent=lang==='de'?'ESP nach Update noch nicht erreichbar.':'ESP is not reachable after update yet.';
+   otaCheckBtn.disabled=false;
+   otaInstallBtn.disabled=false;
+  }
+ },2000);
+}
 document.querySelectorAll('#sensor input,#sensor select,#system input,#system select').forEach(el=>{
  el.addEventListener('input',()=>{formDirty=true});
  el.addEventListener('change',()=>{formDirty=true});

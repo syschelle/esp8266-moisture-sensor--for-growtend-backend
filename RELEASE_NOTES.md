@@ -1,37 +1,30 @@
-# ESP8266 Moisture Sensor v0.1.17
+# ESP8266 Moisture Sensor v0.1.18
 
-This release adds manual editing of the dry and wet calibration values.
+This release fixes the GitHub / PlatformIO build failure introduced with the manual calibration feature.
 
-## Manual calibration values
+## Build fix
 
-The Sensor page now includes two additional numeric fields:
+The manual calibration handler in v0.1.17 referenced non-existent constant names:
 
-- manual dry value
-- manual wet value
+- `SENSOR_ADC_MIN_PLAUSIBLE`
+- `SENSOR_ADC_MAX_PLAUSIBLE`
 
-The existing buttons for capturing the current ADC value as dry or wet remain available.
+The existing firmware constants are:
 
-Manual values are validated both in the browser and by the ESP8266 firmware.
+- `SENSOR_ADC_DISCONNECTED_MAX`
+- `SENSOR_ADC_PLAUSIBLE_MAX`
 
-Allowed range:
+The manual calibration validation now uses the existing canonical constants. ADC values up to and including `50` are treated as disconnected, so manual calibration values must be `51..1000`.
 
-- `50` to `1000`
+No behavior changes are made to the manual calibration limits.
 
-Minimum difference between dry and wet:
+## Tests
 
-- `40` ADC points
+The regression suite now explicitly verifies that:
 
-The values are stored persistently in EEPROM using the existing configuration storage.
-
-New endpoint:
-
-`POST /api/calibration/manual`
-
-Parameters:
-
-- `dry_adc`
-- `wet_adc`
+- manual calibration uses the canonical ADC plausibility constants
+- the obsolete constant names cannot be reintroduced
 
 ## Version
 
-v0.1.17
+v0.1.18

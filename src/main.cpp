@@ -168,7 +168,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.17: deviceName is the single authoritative identity.
+    // v0.1.18: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -833,8 +833,8 @@ static void saveManualCalibration() {
   const int dry = server.arg("dry_adc").toInt();
   const int wet = server.arg("wet_adc").toInt();
 
-  if (dry < SENSOR_ADC_MIN_PLAUSIBLE || dry > SENSOR_ADC_MAX_PLAUSIBLE ||
-      wet < SENSOR_ADC_MIN_PLAUSIBLE || wet > SENSOR_ADC_MAX_PLAUSIBLE) {
+  if (dry <= SENSOR_ADC_DISCONNECTED_MAX || dry > SENSOR_ADC_PLAUSIBLE_MAX ||
+      wet <= SENSOR_ADC_DISCONNECTED_MAX || wet > SENSOR_ADC_PLAUSIBLE_MAX) {
     sendError(400, "Calibration values must be within the plausible ADC range");
     return;
   }

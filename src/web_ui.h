@@ -121,9 +121,9 @@ pre{margin:14px 0 0;background:#0b1118;color:#dce8f2;padding:14px;border-radius:
       <div class="hint" data-i18n="calHint">Trocken und nass müssen ausreichend unterschiedliche ADC-Werte liefern.</div>
       <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)">
         <h3 data-i18n="manualCalibration">Kalibrierwerte manuell anpassen</h3>
-        <label data-i18n="manualDry">Trockenwert manuell</label><input id="manualDry" type="number" min="50" max="1000" step="1">
-        <label data-i18n="manualWet">Nasswert manuell</label><input id="manualWet" type="number" min="50" max="1000" step="1">
-        <div class="hint" data-i18n="manualCalHint">Zulässig sind ADC-Werte von 50 bis 1000. Trocken- und Nasswert müssen mindestens 40 Punkte auseinanderliegen.</div>
+        <label data-i18n="manualDry">Trockenwert manuell</label><input id="manualDry" type="number" min="51" max="1000" step="1">
+        <label data-i18n="manualWet">Nasswert manuell</label><input id="manualWet" type="number" min="51" max="1000" step="1">
+        <div class="hint" data-i18n="manualCalHint">Zulässig sind ADC-Werte von 51 bis 1000. Trocken- und Nasswert müssen mindestens 40 Punkte auseinanderliegen.</div>
         <div class="actions"><button class="action" onclick="saveManualCalibration()" data-i18n="saveCalibration">Kalibrierwerte speichern</button></div>
         <div id="manualCalState" class="saveState"></div>
       </div>
@@ -196,7 +196,7 @@ de:{
  sensorSettings:'Sensoreinstellungen',sensorName:'Sensorname',pinHint:'Beim ESP8266 ist A0 der analoge Sensoreingang.',
  measureInterval:'Messintervall (Sekunden)',sampleCount:'Messungen pro Mittelwert',save:'Speichern',
  calibration:'Kalibrierung',moisture:'Bodenfeuchte',takeDry:'Aktuellen Wert als TROCKEN speichern',
- takeWet:'Aktuellen Wert als NASS speichern',calHint:'Trocken und nass müssen ausreichend unterschiedliche ADC-Werte liefern.',manualCalibration:'Kalibrierwerte manuell anpassen',manualDry:'Trockenwert manuell',manualWet:'Nasswert manuell',manualCalHint:'Zulässig sind ADC-Werte von 50 bis 1000. Trocken- und Nasswert müssen mindestens 40 Punkte auseinanderliegen.',saveCalibration:'Kalibrierwerte speichern',
+ takeWet:'Aktuellen Wert als NASS speichern',calHint:'Trocken und nass müssen ausreichend unterschiedliche ADC-Werte liefern.',manualCalibration:'Kalibrierwerte manuell anpassen',manualDry:'Trockenwert manuell',manualWet:'Nasswert manuell',manualCalHint:'Zulässig sind ADC-Werte von 51 bis 1000. Trocken- und Nasswert müssen mindestens 40 Punkte auseinanderliegen.',saveCalibration:'Kalibrierwerte speichern',
  systemSub:'WLAN, Gerätename, NTP und Oberfläche konfigurieren.',deviceName:'Gerätename',deviceNameHint:'Wird auch als Netzwerk-Hostname verwendet. Nur A-Z, a-z, 0-9 und Bindestrich; keine Leerzeichen oder Umlaute.',wifiPassword:'Wi-Fi Passwort',
  passwordHint:'Leer lassen, um das gespeicherte Passwort beizubehalten.',timezone:'Zeitzone (POSIX TZ)',language:'Sprache',
  reboot:'Neustart',refresh:'Aktualisieren',otaSub:'Firmware aktualisieren.',installed:'Installiert',available:'Verfügbar',
@@ -214,7 +214,7 @@ en:{
  sensorSettings:'Sensor settings',sensorName:'Sensor name',pinHint:'On ESP8266, A0 is the analog sensor input.',
  measureInterval:'Measurement interval (seconds)',sampleCount:'Samples per average',save:'Save',
  calibration:'Calibration',moisture:'Soil moisture',takeDry:'Store current value as DRY',
- takeWet:'Store current value as WET',calHint:'Dry and wet must provide sufficiently different ADC values.',manualCalibration:'Adjust calibration values manually',manualDry:'Manual dry value',manualWet:'Manual wet value',manualCalHint:'Allowed ADC range is 50 to 1000. Dry and wet values must differ by at least 40 points.',saveCalibration:'Save calibration values',
+ takeWet:'Store current value as WET',calHint:'Dry and wet must provide sufficiently different ADC values.',manualCalibration:'Adjust calibration values manually',manualDry:'Manual dry value',manualWet:'Manual wet value',manualCalHint:'Allowed ADC range is 51 to 1000. Dry and wet values must differ by at least 40 points.',saveCalibration:'Save calibration values',
  systemSub:'Configure Wi-Fi, device name, NTP and user interface.',deviceName:'Device name',deviceNameHint:'Also used as the network hostname. Use only A-Z, a-z, 0-9 and hyphen; no spaces or umlauts.',wifiPassword:'Wi-Fi password',
  passwordHint:'Leave empty to keep the stored password.',timezone:'Timezone (POSIX TZ)',language:'Language',
  reboot:'Reboot',refresh:'Refresh',otaSub:'Update firmware.',installed:'Installed',available:'Available',
@@ -311,8 +311,8 @@ async function saveSystem(){
 async function saveManualCalibration(){
  try{
   const dry=parseInt(manualDry.value,10),wet=parseInt(manualWet.value,10);
-  if(!Number.isInteger(dry)||!Number.isInteger(wet)||dry<50||dry>1000||wet<50||wet>1000){
-   throw Error(lang==='de'?'Trocken- und Nasswert müssen zwischen 50 und 1000 liegen.':'Dry and wet values must be between 50 and 1000.');
+  if(!Number.isInteger(dry)||!Number.isInteger(wet)||dry<=50||dry>1000||wet<=50||wet>1000){
+   throw Error(lang==='de'?'Trocken- und Nasswert müssen zwischen 51 und 1000 liegen.':'Dry and wet values must be between 51 and 1000.');
   }
   if(Math.abs(dry-wet)<40){
    throw Error(lang==='de'?'Trocken- und Nasswert müssen mindestens 40 ADC-Punkte auseinanderliegen.':'Dry and wet values must differ by at least 40 ADC points.');

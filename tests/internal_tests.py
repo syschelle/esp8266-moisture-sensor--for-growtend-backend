@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.17", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.17", "0.1.17"))
+check("version newer patch", is_newer("0.1.18", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.18", "0.1.18"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -75,6 +75,10 @@ check("manual calibration persisted", "cfg.dryAdc = static_cast<uint16_t>(dry);"
 check("manual calibration UI", 'id="manualDry"' in UI and 'id="manualWet"' in UI)
 check("manual calibration client validation", "Math.abs(dry-wet)<40" in UI)
 check("manual calibration save action", "saveManualCalibration()" in UI and "'/api/calibration/manual'" in UI)
+
+check("manual calibration uses canonical ADC constants", "SENSOR_ADC_DISCONNECTED_MAX" in MAIN and "SENSOR_ADC_PLAUSIBLE_MAX" in MAIN)
+check("manual calibration lower bound matches disconnected threshold", "dry <= SENSOR_ADC_DISCONNECTED_MAX" in MAIN and "wet <= SENSOR_ADC_DISCONNECTED_MAX" in MAIN)
+check("obsolete manual calibration constants absent", "SENSOR_ADC_MIN_PLAUSIBLE" not in MAIN and "SENSOR_ADC_MAX_PLAUSIBLE" not in MAIN and "SENSOR_ADC_PLAUSIBLE_MIN" not in MAIN)
 
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
@@ -126,7 +130,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.17", bool(m) and m.group(1) == "0.1.17")
+check("firmware version 0.1.18", bool(m) and m.group(1) == "0.1.18")
 
 if failures:
     print("\nInternal regression tests failed:")

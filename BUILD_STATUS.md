@@ -1,16 +1,15 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.16
+# Build / validation status — ESP8266 Moisture Sensor v0.1.17
 
 ## Completed in the artifact environment
 
 - static project validation: PASS
 - internal regression tests: PASS
-- ADC 0..50 disconnected detection: PASS
-- ADC upper plausibility limit 1000: PASS
-- factory calibration disabled: PASS
-- implausible sensor blocks moisture percentage: PASS
-- implausible sensor blocks calibration: PASS
-- health endpoint requires plausible sensor: PASS
-- disconnected status exposed in API/UI: PASS
+- manual dry/wet calibration endpoint: PASS
+- server-side ADC range validation: PASS
+- server-side minimum-span validation: PASS
+- manual calibration UI: PASS
+- client-side validation: PASS
+- EEPROM persistence path retained: PASS
 - JavaScript syntax: PASS
 - ZIP packaging and SHA-256 generation: PASS
 

@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.16", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.16", "0.1.16"))
+check("version newer patch", is_newer("0.1.17", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.17", "0.1.17"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -67,6 +67,14 @@ check("health requires plausible sensor", "sensorState.valid && sensorAdcPlausib
 check("calibration rejects implausible sensor", "Sensor value is implausible / sensor not connected" in MAIN)
 check("sensor status API", '"sensor_status"' in MAIN and 'sensor["status"]' in MAIN)
 check("sensor disconnected UI", "sensorDisconnected" in UI and "sensorStateCode==='not_connected'" in UI)
+
+check("manual calibration endpoint", '"/api/calibration/manual"' in MAIN)
+check("manual calibration range validation", "Calibration values must be within the plausible ADC range" in MAIN)
+check("manual calibration span validation", "Dry and wet calibration values are too close" in MAIN)
+check("manual calibration persisted", "cfg.dryAdc = static_cast<uint16_t>(dry);" in MAIN and "cfg.wetAdc = static_cast<uint16_t>(wet);" in MAIN)
+check("manual calibration UI", 'id="manualDry"' in UI and 'id="manualWet"' in UI)
+check("manual calibration client validation", "Math.abs(dry-wet)<40" in UI)
+check("manual calibration save action", "saveManualCalibration()" in UI and "'/api/calibration/manual'" in UI)
 
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
@@ -118,7 +126,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.16", bool(m) and m.group(1) == "0.1.16")
+check("firmware version 0.1.17", bool(m) and m.group(1) == "0.1.17")
 
 if failures:
     print("\nInternal regression tests failed:")

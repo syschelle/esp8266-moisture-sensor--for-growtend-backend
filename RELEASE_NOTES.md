@@ -1,35 +1,37 @@
-# ESP8266 Moisture Sensor v0.1.16
+# ESP8266 Moisture Sensor v0.1.17
 
-This release adds sensor plausibility detection so an ESP8266 without a connected moisture sensor is no longer reported as 100% soil moisture.
+This release adds manual editing of the dry and wet calibration values.
 
-## Disconnected sensor detection
+## Manual calibration values
 
-ADC values from `0` through `50` are now treated as an implausible / disconnected sensor signal.
+The Sensor page now includes two additional numeric fields:
 
-The upper plausibility limit is `1000`.
+- manual dry value
+- manual wet value
 
-Examples observed during testing:
+The existing buttons for capturing the current ADC value as dry or wet remain available.
 
-- ADC `6` without sensor -> sensor not detected
-- ADC `9` without sensor -> sensor not detected
-- ADC `622` with a sensor hanging in dry air -> plausible measurement
+Manual values are validated both in the browser and by the ESP8266 firmware.
 
-If the ADC value is implausible:
+Allowed range:
 
-- soil moisture is shown as `--`
-- the sensor badge shows `Sensor nicht erkannt`
-- `moisture_percent` is `null`
-- `/api/health` is `degraded`
-- dry/wet calibration is blocked
+- `50` to `1000`
 
-## Factory calibration
+Minimum difference between dry and wet:
 
-Fresh/factory-reset devices no longer use the old example calibration values `800 / 400`.
+- `40` ADC points
 
-The defaults are now `0 / 0`, so a real dry/wet calibration is required before a valid percentage can be produced.
+The values are stored persistently in EEPROM using the existing configuration storage.
 
-Existing saved calibration values are retained after a normal firmware update, but the new plausibility check still prevents ADC values up to 50 from producing a percentage.
+New endpoint:
+
+`POST /api/calibration/manual`
+
+Parameters:
+
+- `dry_adc`
+- `wet_adc`
 
 ## Version
 
-v0.1.16
+v0.1.17

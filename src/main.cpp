@@ -168,7 +168,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.16: deviceName is the single authoritative identity.
+    // v0.1.17: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -824,6 +824,41 @@ static void saveSystemSettings() {
   JsonDocument doc; doc["ok"] = true; doc["wifi_changed"] = wifiChanged; sendJson(doc);
 }
 
+static void saveManualCalibration() {
+  if (!server.hasArg("dry_adc") || !server.hasArg("wet_adc")) {
+    sendError(400, "Missing dry_adc or wet_adc");
+    return;
+  }
+
+  const int dry = server.arg("dry_adc").toInt();
+  const int wet = server.arg("wet_adc").toInt();
+
+  if (dry < SENSOR_ADC_MIN_PLAUSIBLE || dry > SENSOR_ADC_MAX_PLAUSIBLE ||
+      wet < SENSOR_ADC_MIN_PLAUSIBLE || wet > SENSOR_ADC_MAX_PLAUSIBLE) {
+    sendError(400, "Calibration values must be within the plausible ADC range");
+    return;
+  }
+
+  if (abs(dry - wet) < MIN_CALIBRATION_SPAN) {
+    sendError(400, "Dry and wet calibration values are too close");
+    return;
+  }
+
+  cfg.dryAdc = static_cast<uint16_t>(dry);
+  cfg.wetAdc = static_cast<uint16_t>(wet);
+  saveConfig();
+  sensorState.moisturePercent = moistureFromAdc(sensorState.filteredAdc);
+
+  addLog("Manual calibration saved: dry=" + String(cfg.dryAdc) + " wet=" + String(cfg.wetAdc));
+
+  JsonDocument doc;
+  doc["ok"] = true;
+  doc["dry_adc"] = cfg.dryAdc;
+  doc["wet_adc"] = cfg.wetAdc;
+  doc["calibrated"] = calibrated();
+  sendJson(doc);
+}
+
 static void calibratePoint(bool dry) {
   if (!sensorState.valid) return sendError(409, "No sensor measurement available");
   if (!sensorAdcPlausible(sensorState.rawAdc)) return sendError(409, "Sensor value is implausible / sensor not connected");
@@ -881,6 +916,7 @@ static void setupRoutes() {
   server.on("/api/settings/sensor", HTTP_POST, saveSensorSettings);
   server.on("/api/settings/system", HTTP_POST, saveSystemSettings);
   server.on("/api/calibration/dry", HTTP_POST, [](){ calibratePoint(true); });
+  server.on("/api/calibration/manual", HTTP_POST, saveManualCalibration);
   server.on("/api/calibration/wet", HTTP_POST, [](){ calibratePoint(false); });
   server.on("/api/ota/check", HTTP_GET, apiOtaCheck);
   server.on("/api/ota/update", HTTP_POST, apiOtaUpdate);

@@ -168,7 +168,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.22: deviceName is the single authoritative identity.
+    // v0.1.23: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -341,6 +341,12 @@ static void wifiLoop() {
     WiFi.disconnect();
     beginStation();
   }
+}
+
+// ESP8266 lwIP SNTP update interval.
+// The core default is 1 hour. Override the weak function so SNTP refreshes once per day.
+uint32_t sntp_update_delay_MS_rfc_not_less_than_15000() {
+  return 24UL * 60UL * 60UL * 1000UL;
 }
 
 static void configureTime() {

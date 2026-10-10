@@ -14,8 +14,8 @@ ui = (root / "src" / "web_ui.h").read_text(encoding="utf-8")
 readme = (root / "README.md").read_text(encoding="utf-8")
 release = (root / "RELEASE_NOTES.md").read_text(encoding="utf-8")
 
-require('#define APP_VERSION "0.1.22"' in version_h, "version header")
-require("v0.1.22" in readme and "v0.1.22" in release, "release version consistency")
+require('#define APP_VERSION "0.1.23"' in version_h, "version header")
+require("v0.1.23" in readme and "v0.1.23" in release, "release version consistency")
 require('"/api/current-values"' in main, "current-values API")
 require('"/api/health"' in main, "health API")
 require('pin != "A0"' in main, "A0 pin validation")
@@ -32,7 +32,7 @@ require("runs-on: ubuntu-24.04" in workflow, "fixed Ubuntu runner")
 require("pio run -e d1_mini" in workflow, "PlatformIO firmware build")
 require("python scripts/make_ota.py" in workflow, "OTA package creation")
 require("actions/upload-artifact@v4" in workflow, "firmware artifact upload")
-require("esp8266-moisture-sensor-v0.1.22" in workflow, "versioned firmware artifact name")
+require("esp8266-moisture-sensor-v0.1.23" in workflow, "versioned firmware artifact name")
 require("ota-dist/firmware.bin" in workflow, "firmware.bin artifact")
 require('tags:' in workflow and '"v*"' in workflow, "tag-triggered release workflow")
 require("permissions:" in workflow and "contents: write" in workflow, "release write permission")
@@ -158,6 +158,10 @@ require("let releaseNotesReady=false" in ui and "if(releaseNotesReady)" in ui, "
 require("releaseNotesReady=await loadOtaReadme()" in ui, "fallback release notes awaited")
 require("otaInstallBtn.disabled=true" in ui, "install disabled while release notes load")
 require("releaseNotesReady=true" in ui, "embedded release notes mark ready")
+
+require("uint32_t sntp_update_delay_MS_rfc_not_less_than_15000()" in main, "daily SNTP interval override")
+require("return 24UL * 60UL * 60UL * 1000UL;" in main, "24-hour SNTP interval")
+require("configTime(cfg.timezone, cfg.ntpServer);" in main, "configured NTP server and timezone retained")
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.22", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.22", "0.1.22"))
+check("version newer patch", is_newer("0.1.23", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.23", "0.1.23"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -89,6 +89,10 @@ check("manual OTA has upload progress", "xhr.upload.onprogress" in UI)
 check("manual OTA posts to local endpoint", "xhr.open('POST','/api/ota/upload',true)" in UI)
 check("broken uploadBuf removed", "uploadBuf(" not in UI)
 check("manual OTA backend diagnostics", "Manual OTA: upload started" in MAIN and "Manual OTA: firmware installed" in MAIN)
+
+check("daily SNTP update interval override", "uint32_t sntp_update_delay_MS_rfc_not_less_than_15000()" in MAIN)
+check("daily SNTP interval is 24 hours", "return 24UL * 60UL * 60UL * 1000UL;" in MAIN)
+check("NTP configuration still uses configured timezone and server", "configTime(cfg.timezone, cfg.ntpServer);" in MAIN)
 
 # OTA invariants
 check("OTA check endpoint", '"/api/ota/check"' in MAIN)
@@ -151,7 +155,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.22", bool(m) and m.group(1) == "0.1.22")
+check("firmware version 0.1.23", bool(m) and m.group(1) == "0.1.23")
 
 if failures:
     print("\nInternal regression tests failed:")

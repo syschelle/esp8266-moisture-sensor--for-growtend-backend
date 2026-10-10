@@ -1,23 +1,19 @@
-# ESP8266 Moisture Sensor v0.1.22
+# ESP8266 Moisture Sensor v0.1.23
 
-This release changes the OTA page so the **Install update** button is only shown after the release notes have been loaded successfully.
+This release changes the automatic NTP synchronization interval from the ESP8266 core default of one hour to once per day.
 
-## OTA install button behavior
+## Daily NTP synchronization
 
-When a newer firmware version is found, the page now follows this sequence:
+The ESP8266 Arduino core normally refreshes SNTP time every hour.
 
-1. detect the available firmware
-2. load and display the release notes
-3. enable and show **Install update**
+The firmware now overrides the SNTP update interval to:
 
-While the release notes are loading, the install button remains hidden and disabled.
+`24 hours`
 
-If the release notes cannot be loaded, the firmware is still reported as available, but the install button remains hidden.
+The initial NTP synchronization after boot is unchanged. The configured NTP server and timezone are also unchanged.
 
-For current releases the notes are embedded directly in `manifest.json`, so no additional GitHub request is normally required.
-
-Older manifests still use `/api/ota/readme` as a compatibility fallback. In that fallback case the UI waits for the release text before offering installation.
+Saving the NTP server or timezone in System Settings still immediately reconfigures the time service.
 
 ## Version
 
-v0.1.22
+v0.1.23

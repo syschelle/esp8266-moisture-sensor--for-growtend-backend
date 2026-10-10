@@ -1,23 +1,69 @@
-# ESP8266 Moisture Sensor v0.1.29
+# ESP8266 Moisture Sensor v0.1.30
 
-This release adds a clipboard button to the System Log page.
+This release redesigns the Internet OTA check so version detection and release-note loading are faster and no longer depend on cached manifest state.
 
-## Copy System Log
+## Faster version detection
 
-The **Systemprotokoll / System log** page now contains a **Copy to clipboard** button next to **Refresh**.
+The old **Check update** flow downloaded the GitHub Release `manifest.json` through the complete release-asset redirect chain before the UI could display the available version.
 
-The button copies the complete currently displayed System Log.
+The ESP8266 now requests only:
 
-For browsers that support the modern Clipboard API in the current context, `navigator.clipboard` is used.
+`/releases/latest`
 
-Because the ESP8266 web interface is normally opened through a local HTTP address, the UI also contains a fallback based on a temporary textarea and `execCommand('copy')`.
+with redirects disabled.
 
-After the action, the page reports whether the log was copied successfully.
+GitHub's first redirect contains the latest release tag. The firmware extracts the version directly from that redirect.
 
-## No firmware logic changes
+The version check therefore normally uses a single GitHub TLS request and does not download a release asset.
 
-Internet OTA, manual OTA, NTP synchronization, sensor measurement and calibration logic are unchanged from v0.1.28.
+The System Log now records:
+
+- version-check attempt
+- HTTP status
+- request duration
+- Location header length
+- parsed latest version
+- Wi-Fi RSSI
+- free heap
+
+## Release-text error fixed
+
+The error:
+
+`{"error":"No newer firmware selected"}`
+
+came from `/api/ota/readme` depending on `cachedOtaManifestValid`.
+
+That dependency is removed.
+
+The browser now explicitly requests:
+
+`/api/ota/readme?version=<VERSION>`
+
+The ESP8266 loads the matching tagged `RELEASE_NOTES.md` directly from `raw.githubusercontent.com`.
+
+This avoids the GitHub Release asset redirect chain for the release text.
+
+The System Log records the requested version, host, HTTP result, duration and received size.
+
+## Manifest only when installation starts
+
+The compact `manifest.json` is no longer downloaded during **Check update**.
+
+It is fetched only when **Install update** is pressed.
+
+The selected version is sent explicitly to the ESP8266. The downloaded manifest must match that version before the update is scheduled.
+
+## Existing functionality retained
+
+- compact metadata-only manifest
+- version-specific firmware URL
+- SHA-256 verification
+- Internet OTA diagnostics
+- manual Wi-Fi firmware update
+- daily NTP synchronization and NTP logging
+- System Log copy-to-clipboard button
 
 ## Version
 
-v0.1.29
+v0.1.30

@@ -366,10 +366,16 @@ async function reboot(){if(confirm('Reboot?')){await postForm('/api/reboot',{})}
 async function factoryReset(){if(confirm(lang==='de'?'Wirklich alle Einstellungen löschen?':'Really erase all settings?')){await postForm('/api/factory-reset',{})}}
 let otaExpectedVersion='';
 let otaWatchTimer=null;
-async function loadOtaReadme(){
+async function loadOtaReadme(version){
  try{
-  let r=await fetch('/api/ota/readme',{cache:'no-store'}),text=await r.text();
-  if(!r.ok)throw Error(text||('HTTP '+r.status));
+  const v=String(version||'').replace(/^v/,'');
+  if(!v)throw Error(lang==='de'?'Keine Release-Version vorhanden.':'No release version available.');
+  let r=await fetch('/api/ota/readme?version='+encodeURIComponent(v),{cache:'no-store'}),text=await r.text();
+  if(!r.ok){
+   let msg=text;
+   try{const j=JSON.parse(text);msg=j.error||text}catch(_){}
+   throw Error(msg||('HTTP '+r.status));
+  }
   otaReadme.textContent=text;
   otaReadmeCard.style.display='block';
   return true;
@@ -396,7 +402,7 @@ async function checkOta(){
   if(c.update_available){
    otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar. Lade Änderungen…':'New firmware available. Loading changes…';
 
-   const releaseNotesReady=await loadOtaReadme();
+   const releaseNotesReady=await loadOtaReadme(otaExpectedVersion);
 
    if(releaseNotesReady){
     otaMsg.textContent=lang==='de'?'Neue Firmware verfügbar.':'New firmware available.';
@@ -417,7 +423,7 @@ async function checkOta(){
 async function installOta(){
  try{
   otaInstallBtn.disabled=true; otaCheckBtn.disabled=true; otaMsg.textContent=lang==='de'?'Update wird gestartet…':'Starting update…'; otaProgress.style.width='15%';
-  let r=await api('/api/ota/update',{method:'POST'}); otaExpectedVersion=String(r.target_version||otaExpectedVersion).replace(/^v/,'');
+  let r=await postForm('/api/ota/update',{version:otaExpectedVersion}); otaExpectedVersion=String(r.target_version||otaExpectedVersion).replace(/^v/,'');
   otaMsg.textContent=lang==='de'?'Firmware wird geladen und installiert. Gerät nicht ausschalten.':'Firmware is being downloaded and installed. Do not power off.'; otaProgress.style.width='45%'; watchOtaRestart();
  }catch(e){ otaInstallBtn.disabled=false; otaCheckBtn.disabled=false; otaMsg.textContent=e.message; }
 }

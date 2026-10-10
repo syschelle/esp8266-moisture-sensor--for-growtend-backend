@@ -244,7 +244,7 @@ static bool loadConfig() {
     EEPROM.put(0, cfg);
     EEPROM.commit();
   } else if (String(cfg.sensorName) != String(cfg.deviceName)) {
-    // v0.1.29: deviceName is the single authoritative identity.
+    // v0.1.30: deviceName is the single authoritative identity.
     copyText(cfg.sensorName, sizeof(cfg.sensorName), cfg.deviceName);
     cfg.crc = configCrc(cfg);
     EEPROM.put(0, cfg);
@@ -602,6 +602,55 @@ static bool isNewerVersion(const String& candidate, const String& current) {
   return false;
 }
 
+static bool isValidVersionString(const String& version) {
+  int part = 0;
+  for (int i = 0; i < 3; ++i) {
+    if (!parseVersionPart(version, i, part)) return false;
+  }
+
+  String s = version;
+  if (s.startsWith("v")) s.remove(0, 1);
+  int dots = 0;
+  for (size_t i = 0; i < s.length(); ++i) {
+    if (s[i] == '.') ++dots;
+    else if (!isDigit(s[i])) return false;
+  }
+  return dots == 2;
+}
+
+static String otaVersionTag(const String& version) {
+  return version.startsWith("v") ? version : ("v" + version);
+}
+
+static String otaVersionFromLatestLocation(const String& location) {
+  const String marker = "/releases/tag/";
+  const int pos = location.indexOf(marker);
+  if (pos < 0) return "";
+
+  String tag = location.substring(pos + marker.length());
+  const int query = tag.indexOf('?');
+  if (query >= 0) tag.remove(query);
+  const int hash = tag.indexOf('#');
+  if (hash >= 0) tag.remove(hash);
+
+  if (tag.startsWith("v")) tag.remove(0, 1);
+  return isValidVersionString(tag) ? tag : "";
+}
+
+static String otaLatestReleaseUrl() {
+  return "https://github.com/" + String(APP_REPOSITORY) + "/releases/latest";
+}
+
+static String otaManifestUrlForVersion(const String& version) {
+  return "https://github.com/" + String(APP_REPOSITORY) +
+         "/releases/download/" + otaVersionTag(version) + "/manifest.json";
+}
+
+static String otaReleaseNotesRawUrl(const String& version) {
+  return "https://raw.githubusercontent.com/" + String(APP_REPOSITORY) +
+         "/" + otaVersionTag(version) + "/RELEASE_NOTES.md";
+}
+
 static bool otaIsRedirectCode(int code) {
   return code == HTTP_CODE_MOVED_PERMANENTLY ||
          code == HTTP_CODE_FOUND ||
@@ -734,9 +783,81 @@ static bool otaReadManifestBody(HTTPClient& http, char* buffer, size_t capacity,
   return true;
 }
 
-static bool fetchOtaManifest(OtaManifest& out, String& error) {
+static bool fetchLatestReleaseVersion(String& version, String& error) {
+  if (WiFi.status() != WL_CONNECTED) {
+    error = "Wi-Fi not connected";
+    addLog("OTA CHECK: aborted - Wi-Fi not connected");
+    return false;
+  }
+
+  static constexpr uint8_t MAX_VERSION_ATTEMPTS = 3;
+  const char* headerKeys[] = {"Location"};
+  const String url = otaLatestReleaseUrl();
+
+  addLog("OTA: checking latest release version");
+  addLog("OTA CHECK: RSSI " + String(WiFi.RSSI()) +
+         " dBm, heap " + String(ESP.getFreeHeap()) + " B");
+
+  for (uint8_t attempt = 1; attempt <= MAX_VERSION_ATTEMPTS; ++attempt) {
+    BearSSL::WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(8000);
+
+    HTTPClient http;
+    http.setTimeout(8000);
+    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    http.collectHeaders(headerKeys, 1);
+    http.setReuse(false);
+
+    addLog("OTA CHECK: attempt " + String(attempt) + "/" +
+           String(MAX_VERSION_ATTEMPTS) + " host=github.com");
+
+    if (!http.begin(client, url)) {
+      error = "Latest release connection failed";
+      addLog("OTA CHECK: http.begin failed");
+    } else {
+      const uint32_t started = millis();
+      const int code = http.GET();
+      const uint32_t elapsed = (uint32_t)(millis() - started);
+      const String location = http.header("Location");
+
+      addLog("OTA CHECK: HTTP " + String(code) + " after " +
+             String(elapsed) + " ms, locationLen=" +
+             String(location.length()));
+
+      if (otaIsRedirectCode(code)) {
+        version = otaVersionFromLatestLocation(location);
+        if (version.length()) {
+          addLog("OTA CHECK: latest version " + version);
+          http.end();
+          client.stop();
+          return true;
+        }
+        error = "Latest release redirect invalid";
+        addLog("OTA CHECK: could not parse version from redirect");
+      } else {
+        error = "Latest release HTTP " + String(code);
+        addLog("OTA CHECK: unexpected HTTP status");
+      }
+
+      http.end();
+      client.stop();
+    }
+
+    if (attempt < MAX_VERSION_ATTEMPTS) {
+      addLog("OTA CHECK: retry in 500 ms: " + error);
+      delay(500);
+      yield();
+    }
+  }
+
+  addLog("OTA CHECK: attempts exhausted");
+  return false;
+}
+
+static bool fetchOtaManifestForVersion(const String& targetVersion, OtaManifest& out, String& error) {
   resetOtaDiagRuntime();
-  addLog("OTA: checking latest release manifest");
+  addLog("OTA MANIFEST: checking metadata for " + targetVersion);
   addLog("OTA NET: WiFi RSSI " + String(otaDiag.wifiRssi) +
          " dBm, heap " + String(otaDiag.freeHeap) + " B");
 
@@ -752,7 +873,13 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
   static constexpr size_t MANIFEST_BUFFER_SIZE = 768;
   const char* headerKeys[] = {"Location"};
 
-  String currentUrl = OTA_MANIFEST_URL;
+  if (!isValidVersionString(targetVersion)) {
+    error = "Target version invalid";
+    addLog("OTA MANIFEST: invalid target version " + targetVersion);
+    return false;
+  }
+
+  String currentUrl = otaManifestUrlForVersion(targetVersion);
 
   for (uint8_t attempt = 1; attempt <= MAX_MANIFEST_ATTEMPTS; ++attempt) {
     bool retry = false;
@@ -873,7 +1000,14 @@ static bool fetchOtaManifest(OtaManifest& out, String& error) {
         return false;
       }
 
-      addLog("OTA: manifest OK, latest version " + out.version);
+      if (out.version != targetVersion) {
+        error = "Manifest version mismatch";
+        addLog("OTA MANIFEST: version mismatch requested=" + targetVersion +
+               " received=" + out.version);
+        return false;
+      }
+
+      addLog("OTA MANIFEST: metadata OK for " + out.version);
       return true;
     }
 
@@ -1145,27 +1279,36 @@ static bool downloadAndFlashOta(const OtaManifest& manifest, String& error) {
 }
 
 
-static bool fetchOtaReadme(String& content, String& error) {
+static bool fetchOtaReadmeForVersion(const String& version, String& content, String& error) {
+  if (!isValidVersionString(version)) {
+    error = "Release version invalid";
+    return false;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     error = "Wi-Fi not connected";
     return false;
   }
 
-  addLog("OTA: loading release README");
-  addLog("OTA README: heap " + String(ESP.getFreeHeap()) +
-         " B, RSSI " + String(WiFi.RSSI()) + " dBm");
+  const String url = otaReleaseNotesRawUrl(version);
+
+  addLog("OTA README: loading release notes for " + version);
+  addLog("OTA README: host=raw.githubusercontent.com, heap " +
+         String(ESP.getFreeHeap()) + " B, RSSI " +
+         String(WiFi.RSSI()) + " dBm");
 
   BearSSL::WiFiClientSecure client;
   client.setInsecure();
-  client.setTimeout(15000);
+  client.setTimeout(10000);
 
   HTTPClient http;
-  http.setTimeout(15000);
+  http.setTimeout(10000);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.setReuse(false);
 
-  if (!http.begin(client, OTA_README_URL)) {
+  if (!http.begin(client, url)) {
     error = "README connection failed";
+    addLog("OTA README: http.begin failed");
     return false;
   }
 
@@ -1180,39 +1323,59 @@ static bool fetchOtaReadme(String& content, String& error) {
   if (code != HTTP_CODE_OK) {
     error = "README HTTP " + String(code);
     http.end();
+    client.stop();
+    addLog("OTA README: failed: " + error);
     return false;
   }
 
   if (contentLength > 16384) {
     error = "README too large";
     http.end();
+    client.stop();
+    addLog("OTA README: failed: " + error);
     return false;
   }
 
   content = http.getString();
   http.end();
+  client.stop();
 
   addLog("OTA README: received " + String(content.length()) + " B");
 
   if (!content.length()) {
     error = "README empty";
+    addLog("OTA README: failed: " + error);
     return false;
   }
 
-  addLog("OTA: release README loaded");
+  addLog("OTA README: release notes ready for " + version);
   return true;
 }
 
 static void apiOtaReadme() {
-  if (!cachedOtaManifestValid || !isNewerVersion(cachedOtaManifest.version, APP_VERSION)) {
-    sendError(409, "No newer firmware selected");
+  String version = server.arg("version");
+  if (version.startsWith("v")) version.remove(0, 1);
+
+  addLog("OTA README: browser requested version " +
+         (version.length() ? version : String("<missing>")));
+
+  if (!isValidVersionString(version)) {
+    addLog("OTA README: rejected - invalid/missing version");
+    sendError(400, "Release version required");
+    return;
+  }
+
+  if (!isNewerVersion(version, APP_VERSION)) {
+    addLog("OTA README: rejected - version " + version +
+           " is not newer than " + String(APP_VERSION));
+    sendError(409, "Release version is not newer");
     return;
   }
 
   String content;
   String error;
-  if (!fetchOtaReadme(content, error)) {
-    addLog("OTA: README load failed: " + error);
+  if (!fetchOtaReadmeForVersion(version, content, error)) {
+    addLog("OTA README: load failed: " + error);
     sendError(502, error);
     return;
   }
@@ -1221,26 +1384,73 @@ static void apiOtaReadme() {
 }
 
 static void apiOtaCheck() {
-  OtaManifest manifest; String error;
-  if (!fetchOtaManifest(manifest, error)) { addLog("OTA: update check failed: " + error); cachedOtaManifestValid = false; sendError(502, error); return; }
-  cachedOtaManifest = manifest; cachedOtaManifestValid = true;
-  bool available = isNewerVersion(manifest.version, APP_VERSION);
-  addLog(available ? ("OTA: update available " + manifest.version) : "OTA: firmware is up to date");
+  String latestVersion;
+  String error;
+
+  if (!fetchLatestReleaseVersion(latestVersion, error)) {
+    addLog("OTA: update check failed: " + error);
+    sendError(502, error);
+    return;
+  }
+
+  const bool available = isNewerVersion(latestVersion, APP_VERSION);
+  addLog(available ? ("OTA: update available " + latestVersion)
+                   : "OTA: firmware is up to date");
+
   JsonDocument doc;
   doc["current_version"] = APP_VERSION;
-  doc["available_version"] = manifest.version;
+  doc["available_version"] = latestVersion;
   doc["update_available"] = available;
-  doc["size"] = manifest.size;
   sendJson(doc);
 }
 
 static void apiOtaUpdate() {
-  if (otaUpdateRequested || otaJobState == "downloading" || otaJobState == "verifying" || otaJobState == "installing") { sendError(409, "OTA update already running"); return; }
-  if (!cachedOtaManifestValid || !isNewerVersion(cachedOtaManifest.version, APP_VERSION)) { sendError(409, "Run update check first"); return; }
-  otaJobTargetVersion = cachedOtaManifest.version; otaJobState = "scheduled"; otaJobMessage = "Update scheduled";
-  otaUpdateRequested = true; otaUpdateRunAt = millis() + 750;
+  if (otaUpdateRequested || otaJobState == "downloading" ||
+      otaJobState == "verifying" || otaJobState == "installing") {
+    sendError(409, "OTA update already running");
+    return;
+  }
+
+  String targetVersion = server.arg("version");
+  if (targetVersion.startsWith("v")) targetVersion.remove(0, 1);
+
+  addLog("OTA: install requested for version " +
+         (targetVersion.length() ? targetVersion : String("<missing>")));
+
+  if (!isValidVersionString(targetVersion) ||
+      !isNewerVersion(targetVersion, APP_VERSION)) {
+    addLog("OTA: install request rejected - invalid/not newer version");
+    sendError(409, "Valid newer firmware version required");
+    return;
+  }
+
+  OtaManifest manifest;
+  String error;
+  addLog("OTA: loading install manifest for " + targetVersion);
+
+  if (!fetchOtaManifestForVersion(targetVersion, manifest, error)) {
+    cachedOtaManifestValid = false;
+    addLog("OTA: install manifest failed: " + error);
+    sendError(502, error);
+    return;
+  }
+
+  cachedOtaManifest = manifest;
+  cachedOtaManifestValid = true;
+
+  otaJobTargetVersion = targetVersion;
+  otaJobState = "scheduled";
+  otaJobMessage = "Update scheduled";
+  otaUpdateRequested = true;
+  otaUpdateRunAt = millis() + 750;
+
   addLog("OTA: update scheduled for " + otaJobTargetVersion);
-  JsonDocument doc; doc["ok"] = true; doc["started"] = true; doc["target_version"] = otaJobTargetVersion; sendJson(doc);
+
+  JsonDocument doc;
+  doc["ok"] = true;
+  doc["started"] = true;
+  doc["target_version"] = otaJobTargetVersion;
+  sendJson(doc);
 }
 
 static void apiOtaStatus() {
@@ -1545,7 +1755,7 @@ static void setupRoutes() {
   server.on("/api/ota/readme", HTTP_GET, apiOtaReadme);
   server.on("/api/ota/config", HTTP_GET, [](){
     JsonDocument doc;
-    doc["manifest_url"] = OTA_MANIFEST_URL;
+    doc["latest_release_url"] = otaLatestReleaseUrl();
     doc["current_version"] = APP_VERSION;
     doc["repository"] = APP_REPOSITORY;
     sendJson(doc);

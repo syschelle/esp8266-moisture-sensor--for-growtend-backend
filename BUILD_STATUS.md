@@ -1,16 +1,22 @@
-# Build / validation status — ESP8266 Moisture Sensor v0.1.29
+# Build / validation status — ESP8266 Moisture Sensor v0.1.30
 
 ## Completed in the artifact environment
 
 - static project validation: PASS
 - internal regression tests: PASS
-- System Log clipboard button: PASS
-- modern Clipboard API path: PASS
-- local HTTP clipboard fallback: PASS
-- DE/EN clipboard labels: PASS
-- clipboard result message: PASS
+- latest version determined from `/releases/latest` redirect: PASS
+- update check no longer downloads release manifest: PASS
+- detailed version-check logging: PASS
+- release-note endpoint uses explicit version: PASS
+- cached-manifest dependency removed from release notes: PASS
+- release notes use tagged `raw.githubusercontent.com`: PASS
+- install request uses explicit target version: PASS
+- compact manifest fetched only when install starts: PASS
+- manifest target-version validation: PASS
+- System Log copy button retained: PASS
+- manual OTA retained: PASS
+- NTP logging retained: PASS
 - JavaScript syntax: PASS
-- firmware runtime logic unchanged from v0.1.28 except version: PASS
 - ZIP packaging and SHA-256 generation: PASS
 
 ## Local / CI verification

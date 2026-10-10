@@ -38,8 +38,8 @@ def moisture_percent(adc, dry, wet):
     return max(0.0, min(100.0, value))
 
 # Version comparison
-check("version newer patch", is_newer("0.1.29", "0.1.10"))
-check("version equal not newer", not is_newer("v0.1.29", "0.1.29"))
+check("version newer patch", is_newer("0.1.30", "0.1.10"))
+check("version equal not newer", not is_newer("v0.1.30", "0.1.30"))
 check("version older not newer", not is_newer("0.1.9", "0.1.10"))
 check("version minor comparison", is_newer("0.2.0", "0.1.99"))
 
@@ -82,8 +82,8 @@ check("obsolete manual calibration constants absent", "SENSOR_ADC_MIN_PLAUSIBLE"
 
 check("manifest stays compact without release notes", '"release_notes": release_notes' not in OTA_SCRIPT)
 check("OTA check excludes embedded release notes", 'doc["release_notes"] = manifest.releaseNotes' not in MAIN)
-check("OTA UI loads release notes separately", "const releaseNotesReady=await loadOtaReadme()" in UI)
-check("OTA release notes request is awaited", "const releaseNotesReady=await loadOtaReadme()" in UI)
+check("OTA UI loads release notes separately", "const releaseNotesReady=await loadOtaReadme(otaExpectedVersion)" in UI)
+check("OTA release notes request is awaited", "const releaseNotesReady=await loadOtaReadme(otaExpectedVersion)" in UI)
 check("manual OTA uses multipart FormData", "const form=new FormData()" in UI and "form.append('firmware',f,f.name)" in UI)
 check("manual OTA has upload progress", "xhr.upload.onprogress" in UI)
 check("manual OTA posts to local endpoint", "xhr.open('POST','/api/ota/upload',true)" in UI)
@@ -131,7 +131,7 @@ check("manifest uses fixed-buffer body reader", "static bool otaReadManifestBody
 check("manifest no longer uses getString", "payload = http.getString();" not in MAIN)
 check("manifest waits for expected body despite disconnected socket", "while (contentLength <= 0 || bodyLen < (size_t)contentLength)" in MAIN)
 check("manifest body idle timeout", "MANIFEST_BODY_IDLE_TIMEOUT_MS = 3000" in MAIN)
-check("manifest retry reuses resolved URL", "String currentUrl = OTA_MANIFEST_URL;" in MAIN and "retryHost=" in MAIN)
+check("manifest retry reuses resolved URL", "String currentUrl = otaManifestUrlForVersion(targetVersion);" in MAIN and "retryHost=" in MAIN)
 check("manifest requests identity encoding", 'http.addHeader("Accept-Encoding", "identity");' in MAIN)
 check("firmware download not gated by http connected state", "while (total < manifest.size)" in MAIN and "while (http.connected() && total < manifest.size)" not in MAIN)
 check("manual OTA still retained", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
@@ -141,13 +141,27 @@ check("manifest fixed buffer avoids large String allocation", "MANIFEST_BUFFER_S
 check("manifest releaseNotes String removed", "String releaseNotes;" not in MAIN)
 check("manifest asset excludes release notes", '"release_notes": release_notes' not in OTA_SCRIPT)
 check("README remains separate release asset", '(OUT / "README.md").write_text(release_notes' in OTA_SCRIPT)
-check("release notes loaded separately before install", "const releaseNotesReady=await loadOtaReadme()" in UI)
+check("release notes loaded separately before install", "const releaseNotesReady=await loadOtaReadme(otaExpectedVersion)" in UI)
 check("README diagnostics retained", "OTA README: HTTP " in MAIN and "OTA README: received " in MAIN)
 check("manual OTA retained after manifest rollback", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
 check("NTP logging retained after manifest rollback", "NTP: synchronized local=" in MAIN)
 
+check("OTA fast latest release check", "fetchLatestReleaseVersion" in MAIN and "/releases/latest" in MAIN)
+check("OTA latest version parsed from redirect", "otaVersionFromLatestLocation" in MAIN and "/releases/tag/" in MAIN)
+check("OTA latest version check logs timing", "OTA CHECK: HTTP " in MAIN and "OTA CHECK: latest version " in MAIN)
+check("OTA README version is explicit", 'server.arg("version")' in MAIN and "/api/ota/readme?version=" in UI)
+check("OTA README no cached manifest dependency", "No newer firmware selected" not in MAIN)
+check("OTA README uses raw tagged file", "raw.githubusercontent.com" in MAIN and "RELEASE_NOTES.md" in MAIN)
+check("OTA README detailed logging", "OTA README: browser requested version " in MAIN and "OTA README: HTTP " in MAIN)
+check("OTA install version is explicit", "postForm('/api/ota/update',{version:otaExpectedVersion})" in UI)
+check("OTA install fetches manifest on demand", "fetchOtaManifestForVersion(targetVersion, manifest, error)" in MAIN)
+check("OTA install manifest target checked", "Manifest version mismatch" in MAIN)
+check("System log copy button retained in v0.1.30", 'onclick="copyLog()"' in UI)
+check("manual OTA retained in v0.1.30", "form.append('firmware',f,f.name)" in UI and "Manual OTA: upload started" in MAIN)
+check("NTP logging retained in v0.1.30", "NTP: synchronized local=" in MAIN)
+
 # OTA invariants
-check("OTA check endpoint", '"/api/ota/check"' in MAIN)
+check("OTA check endpoint", '"/api/ota/check"' in MAIN and "fetchLatestReleaseVersion" in MAIN)
 check("OTA update endpoint", '"/api/ota/update"' in MAIN)
 check("OTA status endpoint", '"/api/ota/status"' in MAIN)
 check("SHA-256 verification", "Firmware SHA-256 mismatch" in MAIN)
@@ -183,17 +197,17 @@ check("sensor name input removed", 'id="sensorName"' not in UI)
 check("hostname-safe client validation", "const devicePattern=/^[A-Za-z0-9]" in UI)
 check("OTA README endpoint", '"/api/ota/readme"' in MAIN)
 check("OTA README card", 'id="otaReadmeCard"' in UI)
-check("OTA README fallback retained", "loadOtaReadme()" in UI)
+check("OTA README fallback retained", "loadOtaReadme(otaExpectedVersion)" in UI)
 check("OTA README asset contains release notes", 'release_notes = (ROOT / "RELEASE_NOTES.md").read_text' in OTA_SCRIPT)
 
 check("OTA status keeps original hint markup", '<div class="hint" id="otaMsg"></div>' in UI)
 check("OTA status text color override", "#otaMsg{color:var(--text)}" in UI)
 check("no custom OTA status box style", ".otaStatus{" not in UI)
 
-check("install button waits for release notes", "const releaseNotesReady=await loadOtaReadme()" in UI and "if(releaseNotesReady)" in UI)
+check("install button waits for release notes", "const releaseNotesReady=await loadOtaReadme(otaExpectedVersion)" in UI and "if(releaseNotesReady)" in UI)
 check("install button hidden while release notes load", "otaInstallBtn.style.display='none'" in UI and "otaInstallBtn.disabled=true" in UI)
-check("separate release notes unlock install button", "const releaseNotesReady=await loadOtaReadme()" in UI and "if(releaseNotesReady)" in UI)
-check("release notes awaited before install", "const releaseNotesReady=await loadOtaReadme()" in UI)
+check("separate release notes unlock install button", "const releaseNotesReady=await loadOtaReadme(otaExpectedVersion)" in UI and "if(releaseNotesReady)" in UI)
+check("release notes awaited before install", "const releaseNotesReady=await loadOtaReadme(otaExpectedVersion)" in UI)
 check("release note loader reports success", "return true;" in UI and "return false;" in UI)
 check("install button shown inside ready block", "if(releaseNotesReady)" in UI and "otaInstallBtn.style.display='inline-block'" in UI)
 
@@ -214,7 +228,7 @@ check("internal tests in CI", "python tests/internal_tests.py" in WORKFLOW)
 
 # Version consistency
 m = re.search(r'#define APP_VERSION "([^"]+)"', VERSION_H)
-check("firmware version 0.1.29", bool(m) and m.group(1) == "0.1.29")
+check("firmware version 0.1.30", bool(m) and m.group(1) == "0.1.30")
 
 if failures:
     print("\nInternal regression tests failed:")
